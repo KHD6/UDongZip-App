@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@theme {
+  /* 피그마 시안에 맞춘 색상 시스템 구축 */
+  --color-udong-rose: #ff6b6b; /* 네비게이션 바 (기존 rose-400 대용) */
+  --color-udong-rose-hover: #e55b5b; /* 네비게이션 호버 */
+  --color-udong-orange: #ff922b; /* 글쓰기 버튼 (기존 orange-500 대용) */
+  --color-udong-orange-hover: #f76707; /* 글쓰기 호버 */
+  --color-udong-blue: #4dabf7; /* 추후 광고 영역 (기존 blue-400 대용) */
+  --color-udong-purple: #b588f7; /* 우측 콘텐츠 영역 (기존 purple-400 대용) */
+  --color-udong-purple-bg: rgba(181, 136, 247, 0.5); /* 우측 리스트 배경 */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE, Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+/* 1. 볼륨 슬라이더와 음소거 버튼을 완전히 제거 */
+video::-webkit-media-controls-volume-slider,
+video::-webkit-media-controls-mute-button,
+video::-webkit-media-controls-volume-control-container {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  opacity: 0 !important;
+}
+
+/* 2. 혹시 남아있을 수 있는 컨트롤러의 여백 정리 */
+video::-webkit-media-controls-enclosure {
+  /* 필요하다면 컨트롤러 전체의 구조를 조정할 수 있습니다 */
+  max-width: 100% !important;
+}
