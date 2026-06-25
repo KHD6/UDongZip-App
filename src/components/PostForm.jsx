@@ -1,162 +1,106 @@
-import React, { useState, useEffect, useRef } from 'react';
-import ReactDOM from 'react-dom';
+import React, { useState } from "react";
+import { storage } from "../firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 function PostForm({ onSubmit, onClose }) {
-  const [content, setContent] = useState('');
-  
-  // 파일, 임시 주소, 타입을 객체로 묶어서 배열로 관리합니다.
-  const [mediaItems, setMediaItems] = useState([]); 
-  const fileInputRef = useRef(null);
+  const [content, setContent] = useState("");
+  const [mediaList, setMediaList] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // 글도 없고 미디어도 없으면 전송 방지
-    if (!content.trim() && mediaItems.length === 0) return;
-
-    /* =========================================================================
-       [★ 가장 중요한 배달 사고 해결 포인트 ★]
-       App.jsx의 handleCreatePost가 ({ content, mediaList }) 형태로 구조 분해 할당을 하므로,
-       여기서 보낼 때 반드시 정확히 'mediaList'라는 이름으로 매칭해서 던져야 합니다!
-       ========================================================================= */
-    onSubmit({
-      content: content,
-      mediaList: mediaItems.map(item => ({
-        url: item.preview,
-        type: item.type
-      }))
-    });
-    
-    // 상태 초기화 및 닫기
-    setContent('');
-    setMediaItems([]);
-    onClose();
-  };
-
-  // 파일 추가 선택 시 작동
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
-    if (!files.length) return;
-
-    // 새로 선택된 파일들을 순회하며 가상 URL 및 타입 추출
-    const newItems = files.map(file => ({
+    const newMedia = files.map(file => ({
       file,
-      preview: URL.createObjectURL(file),
-      type: file.type.startsWith('image/') ? 'image' : 'video'
+      url: URL.createObjectURL(file),
+      type: file.type.startsWith("video") ? "video" : "image"
     }));
-
-    // 기존에 선택해둔 미디어 뒤에 이어 붙이기 (다중 등록 허용)
-    setMediaItems([...mediaItems, ...newItems]);
+    setMediaList([...mediaList, ...newMedia]);
   };
 
-  // 선택된 미디어 개별 삭제 기능
   const removeMedia = (index) => {
-    const updated = [...mediaItems];
-    // 브라우저 메모리 관리를 위해 가상 URL 해제
-    URL.revokeObjectURL(updated[index].preview);
-    updated.splice(index, 1);
-    setMediaItems(updated);
+    setMediaList(mediaList.filter((_, i) => i !== index));
   };
 
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, []);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!content.trim() && mediaList.length === 0) return;
 
-  return ReactDOM.createPortal(
-    <div 
-      onClick={onClose} 
-      className="fixed inset-0 bg-slate-950/70 z-[999] flex justify-end flex-col animate-fadeIn cursor-pointer"
-    >
-      <form 
-        onClick={(e) => e.stopPropagation()} 
-        onSubmit={handleSubmit}
-        className="w-full h-[100dvh] bg-white rounded-t-3xl shadow-xl flex flex-col animate-slideInUp 
-                   md:h-auto md:max-w-2xl md:mx-auto md:rounded-2xl md:mb-10 cursor-default"
-      >
-        
-        {/* 모달 상단 헤더 */}
-        <div className="p-4 flex justify-between items-center border-b border-slate-100 shrink-0">
-          <button type="button" onClick={onClose} className="p-1 text-slate-500 hover:text-slate-700 transition cursor-pointer">
-            <span>❌</span>
-          </button>
+    setIsUploading(true);
+
+    try {
+      // 1. 모든 파일을 Storage에 업로드하고 주소 받아오기
+      const uploadedMediaList = await Promise.all(
+        mediaList.map(async (item) => {
+          if (!item.file) return item;
           
-          <h2 className="hidden md:block font-bold text-slate-800">새 게시글 작성</h2>
+          // 파일명에 고유 ID 부여 (crypto.randomUUID 사용)
+          const fileName = `${crypto.randomUUID()}_${item.file.name}`;
+          const storageRef = ref(storage, `posts/${fileName}`);
           
-          <button 
-            type="submit" 
-            disabled={!content.trim() && mediaItems.length === 0}
-            className={`px-5 py-2 rounded-full font-bold text-sm shadow-sm transition tracking-tight
-              ${content.trim() || mediaItems.length > 0 
-                ? 'bg-udong-orange hover:bg-udong-orange-hover text-white cursor-pointer' 
-                : 'bg-orange-200 text-orange-100 cursor-not-allowed'
-              }`}
-          >
-            게시하기
-          </button>
+          await uploadBytes(storageRef, item.file);
+          const url = await getDownloadURL(storageRef);
+          
+          return { url, type: item.type };
+        })
+      );
+
+      // 2. 결과 전달
+      onSubmit({ content, mediaList: uploadedMediaList });
+      onClose();
+    } catch (error) {
+      console.error("업로드 실패:", error);
+      alert("파일 업로드 중 오류가 발생했습니다.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-8">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-slate-700">새 기록 작성</h2>
+          <button onClick={onClose} className="text-slate-400">✕</button>
         </div>
 
-        {/* 모달 본문 입력창 */}
-        <div className="flex-1 p-4 flex flex-col overflow-y-auto pt-6 gap-6">
-          <div className="flex gap-3">
-            <div className="w-10 h-10 bg-slate-200 rounded-full shrink-0 flex items-center justify-center text-xs text-slate-500 font-bold">
-              나
-            </div>
-            <textarea 
-              value={content} 
-              onChange={(e) => setContent(e.target.value)} 
-              placeholder="동물 친구들의 오늘 소식을 들려주세요!" 
-              rows="3" 
-              className="w-full resize-none border-none outline-none text-slate-800 placeholder-slate-400 text-sm focus:ring-0 pt-1" 
-              autoFocus 
-            />
+        <form onSubmit={handleSubmit}>
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="w-full h-48 p-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none resize-none"
+            placeholder="오늘의 소중한 순간을 기록해보세요 :)"
+          />
+          
+          <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+            {mediaList.map((m, idx) => (
+              <div key={idx} className="relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden border border-slate-200">
+                {m.type === 'video' ? (
+                  <video src={m.url} className="w-full h-full object-cover" />
+                ) : (
+                  <img src={m.url} className="w-full h-full object-cover" />
+                )}
+                <button type="button" onClick={() => removeMedia(idx)} className="absolute top-1 right-1 bg-black/50 text-white rounded-full w-5 h-5 text-xs">✕</button>
+              </div>
+            ))}
           </div>
 
-          {/* 🎬 글쓰기 창 내부 가로 스크롤 미리보기 리스트 */}
-          {mediaItems.length > 0 && (
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-              {mediaItems.map((item, idx) => (
-                <div key={idx} className="relative min-w-[180px] h-[135px] bg-slate-900 rounded-xl overflow-hidden shrink-0 border border-slate-100">
-                  <button 
-                    type="button" 
-                    onClick={() => removeMedia(idx)} 
-                    className="absolute top-1 right-1 z-10 w-6 h-6 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center text-[10px] font-bold transition cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                  {item.type === 'image' ? (
-                    <img src={item.preview} className="w-full h-full object-cover" alt="" />
-                  ) : (
-                    <video src={item.preview} className="w-full h-full object-cover" />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* 하단 미디어 파일 추가 바 */}
-        <div className="flex p-4 gap-2 text-lg shrink-0 pb-10 md:pb-4 border-t border-slate-50 select-none">
-          <span 
-            onClick={() => fileInputRef.current.click()} 
-            className="hover:bg-slate-100 p-2 rounded-xl transition cursor-pointer flex items-center justify-center"
-          >
-            🖼️
-          </span>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            accept="image/*, video/*" 
-            multiple // 여러 개 파일 다중 선택 기능 오픈
-            className="hidden" 
-          />
-        </div>
-        
-      </form>
-    </div>,
-    document.getElementById('modal-root')
+          <div className="mt-4 flex items-center justify-between">
+            <label className="cursor-pointer bg-slate-100 p-3 rounded-xl">
+              <span>🖼️</span>
+              <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={handleFileChange} />
+            </label>
+            
+            <button 
+              type="submit" 
+              disabled={isUploading}
+              className="px-6 py-2 rounded-xl bg-slate-800 text-white font-semibold hover:bg-slate-700 transition"
+            >
+              {isUploading ? "업로드 중..." : "기록하기"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

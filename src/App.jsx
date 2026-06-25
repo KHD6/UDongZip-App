@@ -1,85 +1,99 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // useEffect 추가
 import Sidebar from "./components/Sidebar";
 import PostCard from "./components/PostCard";
 import RightSidebar from "./components/RightSidebar";
 import PostForm from "./components/PostForm";
 import MediaViewer from "./components/MediaViewer";
+import { db } from "./firebase";
+import { collection, addDoc, getDocs, query, orderBy } from "firebase/firestore";
 
 function App() {
-  const [volume, setVolume] = useState(0.8); // 기본 볼륨 80%
+  const [volume, setVolume] = useState(0.8);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [playingPostId, setPlayingPostId] = useState(null);
-  const [viewer, setViewer] = useState({
-    isOpen: false,
-    list: [],
-    index: 0,
-    postId: null,
-  });
+  const [viewer, setViewer] = useState({ isOpen: false, list: [], index: 0, postId: null });
+  const [posts, setPosts] = useState([]);
 
-  const [posts, setPosts] = useState([{}]);
+  // 데이터를 불러오는 공통 함수
+  const fetchPosts = async () => {
+    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    const loadedPosts = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    setPosts(loadedPosts);
+  };
 
-  const handleCreatePost = ({ content, mediaList }) => {
-    const newPost = {
-      id: Date.now(),
-      nickname: "새로운 작성자",
-      content,
-      mediaList,
-      lastIndex: 0,
-    };
-    setPosts([newPost, ...posts]);
+  // 앱 시작 시 데이터 로드
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const handleCreatePost = async ({ content, mediaList }) => {
+    try {
+      await addDoc(collection(db, "posts"), {
+        content: content,
+        mediaList: mediaList,
+        nickname: "행복한 슈글이",
+        createdAt: new Date(),
+      });
+      console.log("데이터 저장 성공!");
+      
+      // [중요] 저장 성공 후 데이터를 다시 불러와 화면 갱신
+      fetchPosts(); 
+    } catch (error) {
+      console.error("저장 실패: ", error);
+    }
   };
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-slate-100 pb-16 md:pb-0">
-      <Sidebar onOpenModal={() => setIsModalOpen(true)} />
-      <main className="flex-1 p-4 max-w-2xl mx-auto w-full space-y-4 pt-14">
-        {posts.map((post) => (
-          <PostCard
-            key={post.id}
-            nickname={post.nickname}
-            content={post.content}
-            mediaList={post.mediaList}
-            initialIndex={post.lastIndex}
-            volume={volume}
-            onVisibilityChange={(isVisible) => {
-              // 모바일/태블릿에서는 스크롤 위치로 자동 재생
-              const isTouch = window.matchMedia("(pointer: coarse)").matches;
-              if (isTouch && isVisible) setPlayingPostId(post.id);
-            }}
-            onHoverStateChange={(isHovered) => {
-              // PC(마우스)에서는 hover 시점에만 재생
-              const isMouse = window.matchMedia("(pointer: fine)").matches;
-              if (isMouse) {
-                setPlayingPostId(isHovered ? post.id : null);
+    <div className="min-h-screen bg-[#fdfbf7] text-slate-800">
+      <div className="flex flex-col md:flex-row max-w-6xl mx-auto">
+        <Sidebar onOpenModal={() => setIsModalOpen(true)} />
+        <main className="flex-1 p-4 md:p-6 space-y-8 pt-14">
+          {posts.map((post) => (
+            <PostCard
+              key={post.id}
+              {...post}
+              initialIndex={post.lastIndex}
+              volume={volume}
+              onVisibilityChange={(isVisible) => {
+                const isTouch = window.matchMedia("(pointer: coarse)").matches;
+                if (isTouch && isVisible) setPlayingPostId(post.id);
+              }}
+              onHoverStateChange={(isHovered) => {
+                const isMouse = window.matchMedia("(pointer: fine)").matches;
+                if (isMouse) setPlayingPostId(isHovered ? post.id : null);
+              }}
+              onOpenViewer={(idx) =>
+                setViewer({
+                  isOpen: true,
+                  list: post.mediaList,
+                  index: idx,
+                  postId: post.id,
+                })
               }
-            }}
-            onOpenViewer={(idx) =>
-              setViewer({
-                isOpen: true,
-                list: post.mediaList,
-                index: idx,
-                postId: post.id,
-              })
-            }
-            onUpdateIndex={(idx) =>
-              setPosts((prev) =>
-                prev.map((p) =>
-                  p.id === post.id ? { ...p, lastIndex: idx } : p,
-                ),
-              )
-            }
-            isPlaying={playingPostId === post.id}
-            onVolumeChange={setVolume}
-          />
-        ))}
-      </main>
-
+              onUpdateIndex={(idx) =>
+                setPosts((prev) =>
+                  prev.map((p) =>
+                    p.id === post.id ? { ...p, lastIndex: idx } : p,
+                  ),
+                )
+              }
+              isPlaying={playingPostId === post.id}
+              onVolumeChange={setVolume}
+            />
+          ))}
+        </main>
+        <RightSidebar />
+      </div>
       {viewer.isOpen && (
         <MediaViewer
           mediaList={viewer.list}
           initialIndex={viewer.index}
           volume={volume}
-          onVolumeChange={(val) => setVolume(val)}
+          onVolumeChange={setVolume}
           onClose={(lastIdx) => {
             setPosts((prev) =>
               prev.map((p) =>
@@ -90,7 +104,6 @@ function App() {
           }}
         />
       )}
-      <RightSidebar />
       {isModalOpen && (
         <PostForm
           onSubmit={handleCreatePost}
@@ -100,5 +113,4 @@ function App() {
     </div>
   );
 }
-
 export default App;

@@ -2,116 +2,80 @@ import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import VolumeControl from "./VolumeControl";
 
-const STORAGE_INDEX_KEY = "udongzip_media_index";
-const STORAGE_VOLUME_KEY = "udongzip_media_volume";
-
-function MediaViewer({ mediaList, initialIndex = 0, onClose, volume: initialVolume, onVolumeChange }) {
+function MediaViewer({ mediaList, initialIndex = 0, onClose, volume, onVolumeChange }) {
   const videoRef = useRef(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const containerRef = useRef(null);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const getStoredIndex = () => {
-    const stored = localStorage.getItem(STORAGE_INDEX_KEY);
-    const parsed = parseInt(stored, 10);
-    return !isNaN(parsed) && parsed >= 0 && parsed < mediaList.length ? parsed : initialIndex;
-  };
-
-  const getStoredVolume = () => {
-    const stored = localStorage.getItem(STORAGE_VOLUME_KEY);
-    return stored ? parseFloat(stored) : (initialVolume !== undefined ? initialVolume : 0.5);
-  };
-
-  const [currentIndex, setCurrentIndex] = useState(getStoredIndex());
-  const [currentVolume, setCurrentVolume] = useState(getStoredVolume());
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_INDEX_KEY, currentIndex);
-  }, [currentIndex]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_VOLUME_KEY, currentVolume);
-  }, [currentVolume]);
-
-  const updateVolume = (val) => {
-    const fixedVol = parseFloat(val.toFixed(1));
-    setCurrentVolume(fixedVol);
+  // 볼륨 업데이트를 위한 내부 함수
+  const updateVolume = (newVolume) => {
+    const fixedVol = Math.max(0, Math.min(1, parseFloat(newVolume.toFixed(1))));
     if (onVolumeChange) onVolumeChange(fixedVol);
     if (videoRef.current) videoRef.current.volume = fixedVol;
   };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // 방향키 스크롤 방지
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
-        e.preventDefault();
-      }
-
-      if (e.key === "ArrowLeft" && currentIndex > 0) setCurrentIndex((c) => c - 1);
-      if (e.key === "ArrowRight" && currentIndex < mediaList.length - 1) setCurrentIndex((c) => c + 1);
-      if (e.key === "ArrowUp") updateVolume(Math.min(currentVolume + 0.1, 1));
-      if (e.key === "ArrowDown") updateVolume(Math.max(currentVolume - 0.1, 0));
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+      
+      // 이동 로직
+      if (e.key === "ArrowLeft" && currentIndex > 0) setCurrentIndex(c => c - 1);
+      if (e.key === "ArrowRight" && currentIndex < mediaList.length - 1) setCurrentIndex(c => c + 1);
+      
+      // 소리 조절 로직 (중요: 여기서 onVolumeChange를 통해 상태를 바꿉니다)
+      if (e.key === "ArrowUp") updateVolume(volume + 0.1);
+      if (e.key === "ArrowDown") updateVolume(volume - 0.1);
+      
+      // 기타 기능
       if (e.key === "Escape") onClose(currentIndex);
       if (e.key === " ") {
-        if (videoRef.current) videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause();
+        if (videoRef.current) {
+          videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause();
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, currentVolume, onClose, mediaList.length]);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
-    window.addEventListener("resize", handleResize);
-    
-    if (videoRef.current) {
-      videoRef.current.volume = currentVolume;
-      videoRef.current.play().catch((e) => console.log("자동재생 제한:", e));
-    }
-    
-    return () => window.removeEventListener("resize", handleResize);
-  }, [currentIndex]);
+  }, [currentIndex, onClose, mediaList.length, volume, onVolumeChange]);
 
   return ReactDOM.createPortal(
-    <div className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center">
-      <button 
-        onClick={() => onClose(currentIndex)} 
-        className="absolute top-4 right-4 text-white text-3xl z-[10005] p-2 hover:bg-white/10 rounded-full"
-      >
-        ✕
-      </button>
-
-      <div className="flex items-center gap-6">
-        <div className="relative">
-          {mediaList[currentIndex].type === "video" ? (
-            <video
-              key={mediaList[currentIndex].url}
-              ref={videoRef}
-              src={mediaList[currentIndex].url}
-              controls
-              playsInline
-              className="max-h-[90vh] max-w-[80vw]"
-            />
-          ) : (
-            <img src={mediaList[currentIndex].url} className="max-h-[90vh] max-w-[80vw] object-contain" alt="" />
-          )}
-        </div>
-
-        {/* 볼륨 컨트롤러: 영상일 때만 노출 */}
-        {!isMobile && mediaList[currentIndex].type === "video" && (
-          <div className="z-[10001]">
-            <VolumeControl volume={currentVolume} onVolumeChange={updateVolume} />
-          </div>
-        )}
-      </div>
-
+    <div className="fixed inset-0 bg-slate-100/90 backdrop-blur-xl z-[9999] flex items-center justify-center">
+      <button onClick={() => onClose(currentIndex)} className="absolute top-6 right-6 bg-white/50 hover:bg-white p-2 rounded-full z-[10005]">✕</button>
+      
       {currentIndex > 0 && (
-        <button className="absolute left-4 z-[10005] bg-black/50 text-white p-4 rounded-full" onClick={() => setCurrentIndex((c) => c - 1)}>〈</button>
+        <button onClick={() => setCurrentIndex(c => c - 1)} className="absolute left-6 z-[10005] bg-white/50 p-4 rounded-full">〈</button>
       )}
       {currentIndex < mediaList.length - 1 && (
-        <button className="absolute right-20 z-[10005] bg-black/50 text-white p-4 rounded-full" onClick={() => setCurrentIndex((c) => c + 1)}>〉</button>
+        <button onClick={() => setCurrentIndex(c => c + 1)} className="absolute right-6 z-[10005] bg-white/50 p-4 rounded-full">〉</button>
       )}
+
+      <div className="flex items-center gap-6">
+        <div className="rounded-3xl overflow-hidden shadow-2xl bg-black">
+          {mediaList[currentIndex].type === "video" ? (
+            <video 
+              key={mediaList[currentIndex].url} 
+              ref={videoRef} 
+              src={mediaList[currentIndex].url} 
+              autoPlay 
+              controls 
+              onLoadedData={() => {
+                setIsLoading(false);
+                if (videoRef.current) videoRef.current.volume = volume; // 초기 볼륨 동기화
+              }} 
+              className="max-h-[85vh] max-w-[80vw]" 
+            />
+          ) : (
+            <img src={mediaList[currentIndex].url} className="max-h-[85vh] max-w-[80vw] object-contain" onLoad={() => setIsLoading(false)} />
+          )}
+        </div>
+        
+        {mediaList[currentIndex].type === "video" && (
+          <VolumeControl volume={volume} onVolumeChange={onVolumeChange} />
+        )}
+      </div>
     </div>,
     document.getElementById("modal-root") || document.body
   );
 }
-
 export default MediaViewer;
