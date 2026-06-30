@@ -83,12 +83,13 @@ function MainContent() {
                       window.matchMedia("(pointer: fine)").matches;
                     if (isMouse) setPlayingPostId(isHovered ? post.id : null);
                   }}
-                  onOpenViewer={(idx) =>
+                  onOpenViewer={(idx, onCloseCallback) =>
                     setViewer({
                       isOpen: true,
                       list: post.mediaList,
                       index: idx,
                       postId: post.id,
+                      onClose: onCloseCallback,
                     })
                   }
                   onUpdateIndex={(idx) =>
@@ -111,12 +112,8 @@ function MainContent() {
               initialIndex={viewer.index}
               volume={volume}
               onVolumeChange={setVolume}
-              onClose={(lastIdx) => {
-                setPosts((prev) =>
-                  prev.map((p) =>
-                    p.id === viewer.postId ? { ...p, lastIndex: lastIdx } : p,
-                  ),
-                );
+              onClose={(lastIndex) => {
+                if (viewer.onClose) viewer.onClose(lastIndex);
                 setViewer({ ...viewer, isOpen: false });
               }}
             />
