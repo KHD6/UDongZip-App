@@ -6,24 +6,24 @@ import RightSidebar from "./RightSidebar";
 import PostForm from "./PostForm";
 import MediaViewer from "./MediaViewer";
 import { db, auth } from "../firebase";
-import {
-  collection,
-  getDocs,
-  query,
-  orderBy,
-  addDoc, // <--- 여기서 addDoc을 추가했습니다
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy, 
+  addDoc 
 } from "firebase/firestore";
 
 function MainContent() {
   const [volume, setVolume] = useState(0.8);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [playingPostId, setPlayingPostId] = useState(null);
-  const [viewer, setViewer] = useState({
-    isOpen: false,
-    list: [],
-    index: 0,
-    postId: null,
-    onClose: null,
+  const [viewer, setViewer] = useState({ 
+    isOpen: false, 
+    list: [], 
+    index: 0, 
+    postId: null, 
+    onClose: null 
   });
   const [posts, setPosts] = useState([]);
 
@@ -52,7 +52,7 @@ function MainContent() {
         photoURL: auth.currentUser.photoURL || null,
         createdAt: new Date(),
       });
-      fetchPosts(); // 저장 후 목록 갱신
+      fetchPosts();
     } catch (error) {
       console.error("저장 실패: ", error);
     }
@@ -72,28 +72,22 @@ function MainContent() {
               volume={volume}
               isPlaying={playingPostId === post.id}
               onVisibilityChange={(isVisible) => {
-                if (window.matchMedia("(pointer: coarse)").matches && isVisible)
-                  setPlayingPostId(post.id);
+                if (window.matchMedia("(pointer: coarse)").matches && isVisible) setPlayingPostId(post.id);
               }}
               onHoverStateChange={(isHovered) => {
-                if (window.matchMedia("(pointer: fine)").matches)
-                  setPlayingPostId(isHovered ? post.id : null);
+                if (window.matchMedia("(pointer: fine)").matches) setPlayingPostId(isHovered ? post.id : null);
               }}
               onOpenViewer={(idx, onCloseCallback) =>
-                setViewer({
-                  isOpen: true,
-                  list: post.mediaList,
-                  index: idx,
-                  postId: post.id,
-                  onClose: onCloseCallback,
+                setViewer({ 
+                  isOpen: true, 
+                  list: post.mediaList || [], 
+                  index: idx, 
+                  postId: post.id, 
+                  onClose: onCloseCallback 
                 })
               }
               onUpdateIndex={(idx) =>
-                setPosts((prev) =>
-                  prev.map((p) =>
-                    p.id === post.id ? { ...p, lastIndex: idx } : p
-                  )
-                )
+                setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, lastIndex: idx } : p)))
               }
               onVolumeChange={setVolume}
             />
@@ -103,7 +97,6 @@ function MainContent() {
         <RightSidebar />
       </div>
 
-      {/* 모바일 플로팅 버튼 */}
       <button
         onClick={() => setIsModalOpen(true)}
         className="md:hidden fixed bottom-6 right-6 z-[90] w-14 h-14 bg-slate-800 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-slate-700 transition-all active:scale-95"
@@ -111,10 +104,10 @@ function MainContent() {
         <Plus size={28} />
       </button>
 
-      {/* 모달/뷰어 */}
       {viewer.isOpen && (
         <MediaViewer
-          {...viewer}
+          mediaList={viewer.list}
+          initialIndex={viewer.index}
           volume={volume}
           onVolumeChange={setVolume}
           onClose={(lastIndex) => {
@@ -123,6 +116,7 @@ function MainContent() {
           }}
         />
       )}
+
       {isModalOpen && (
         <PostForm
           onSubmit={handleCreatePost}
