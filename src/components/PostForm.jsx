@@ -9,10 +9,10 @@ function PostForm({ onSubmit, onClose }) {
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
-    const newMedia = files.map(file => ({
+    const newMedia = files.map((file) => ({
       file,
       url: URL.createObjectURL(file),
-      type: file.type.startsWith("video") ? "video" : "image"
+      type: file.type.startsWith("video") ? "video" : "image",
     }));
     setMediaList([...mediaList, ...newMedia]);
   };
@@ -28,19 +28,24 @@ function PostForm({ onSubmit, onClose }) {
     setIsUploading(true);
 
     try {
-      // 1. 모든 파일을 Storage에 업로드하고 주소 받아오기
+      // 1. 모든 파일을 Storage에 업로드하고 주소와 경로를 함께 받아오기
       const uploadedMediaList = await Promise.all(
         mediaList.map(async (item) => {
           if (!item.file) return item;
-          
-          // 파일명에 고유 ID 부여 (crypto.randomUUID 사용)
+
+          // 파일명에 고유 ID 부여
           const fileName = `${crypto.randomUUID()}_${item.file.name}`;
           const storageRef = ref(storage, `posts/${fileName}`);
-          
+
           await uploadBytes(storageRef, item.file);
           const url = await getDownloadURL(storageRef);
-          
-          return { url, type: item.type };
+
+          // !!추가된 내용!!: url뿐만 아니라 storageRef.fullPath(경로)를 함께 반환합니다.
+          return { 
+            url, 
+            type: item.type, 
+            path: storageRef.fullPath 
+          };
         })
       );
 
@@ -70,14 +75,14 @@ function PostForm({ onSubmit, onClose }) {
             className="w-full h-48 p-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none resize-none"
             placeholder="오늘의 소중한 순간을 기록해보세요 :)"
           />
-          
+
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
             {mediaList.map((m, idx) => (
               <div key={idx} className="relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden border border-slate-200">
                 {m.type === 'video' ? (
                   <video src={m.url} className="w-full h-full object-cover" />
                 ) : (
-                  <img src={m.url} className="w-full h-full object-cover" />
+                  <img src={m.url} className="w-full h-full object-cover" alt="" />
                 )}
                 <button type="button" onClick={() => removeMedia(idx)} className="absolute top-1 right-1 bg-black/50 text-white rounded-full w-5 h-5 text-xs">✕</button>
               </div>
@@ -89,9 +94,9 @@ function PostForm({ onSubmit, onClose }) {
               <span>🖼️</span>
               <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={handleFileChange} />
             </label>
-            
-            <button 
-              type="submit" 
+
+            <button
+              type="submit"
               disabled={isUploading}
               className="px-6 py-2 rounded-xl bg-slate-800 text-white font-semibold hover:bg-slate-700 transition"
             >

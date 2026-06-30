@@ -1,116 +1,72 @@
-import React, { useState, useEffect } from "react"; // useEffect 추가
-import Sidebar from "./components/Sidebar";
-import PostCard from "./components/PostCard";
-import RightSidebar from "./components/RightSidebar";
-import PostForm from "./components/PostForm";
-import MediaViewer from "./components/MediaViewer";
-import { db } from "./firebase";
-import { collection, addDoc, getDocs, query, orderBy } from "firebase/firestore";
+import React, { useState } from "react";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import MainContent from "./MainContent";
+import LoginButtons from "./components/LoginButtons";
+import { updateProfile, signOut } from "firebase/auth";
+import { auth } from "./firebase";
 
-function App() {
-  const [volume, setVolume] = useState(0.8);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [playingPostId, setPlayingPostId] = useState(null);
-  const [viewer, setViewer] = useState({ isOpen: false, list: [], index: 0, postId: null });
-  const [posts, setPosts] = useState([]);
+function AppContent() {
+  const { user } = useAuth();
 
-  // 데이터를 불러오는 공통 함수
-  const fetchPosts = async () => {
-    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    const loadedPosts = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    setPosts(loadedPosts);
-  };
+  if (user && !user.displayName) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4 bg-[#fdfbf7]">
+        <h2 className="text-xl font-bold text-slate-800">닉네임을 입력해주세요</h2>
 
-  // 앱 시작 시 데이터 로드
-  useEffect(() => {
-    fetchPosts();
-  }, []);
+        <input
+          id="nick"
+          defaultValue={""} // 새 사용자는 빈칸
+          className="border p-2 rounded w-64"
+          placeholder="사용할 닉네임"
+        />
 
-  const handleCreatePost = async ({ content, mediaList }) => {
-    try {
-      await addDoc(collection(db, "posts"), {
-        content: content,
-        mediaList: mediaList,
-        nickname: "행복한 슈글이",
-        createdAt: new Date(),
-      });
-      console.log("데이터 저장 성공!");
-      
-      // [중요] 저장 성공 후 데이터를 다시 불러와 화면 갱신
-      fetchPosts(); 
-    } catch (error) {
-      console.error("저장 실패: ", error);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#fdfbf7] text-slate-800">
-      <div className="flex flex-col md:flex-row max-w-6xl mx-auto">
-        <Sidebar onOpenModal={() => setIsModalOpen(true)} />
-        <main className="flex-1 p-4 md:p-6 space-y-8 pt-14">
-          {posts.map((post) => (
-            <PostCard
-              key={post.id}
-              {...post}
-              initialIndex={post.lastIndex}
-              volume={volume}
-              onVisibilityChange={(isVisible) => {
-                const isTouch = window.matchMedia("(pointer: coarse)").matches;
-                if (isTouch && isVisible) setPlayingPostId(post.id);
-              }}
-              onHoverStateChange={(isHovered) => {
-                const isMouse = window.matchMedia("(pointer: fine)").matches;
-                if (isMouse) setPlayingPostId(isHovered ? post.id : null);
-              }}
-              onOpenViewer={(idx) =>
-                setViewer({
-                  isOpen: true,
-                  list: post.mediaList,
-                  index: idx,
-                  postId: post.id,
-                })
+        <div className="flex gap-2">
+          <button
+            onClick={async () => {
+              const nick = document.getElementById("nick").value;
+              if (nick.trim()) {
+                // Firebase 프로필 업데이트
+                await updateProfile(user, { displayName: nick });
+                // 중요: 상태가 동기화되도록 강제 새로고침
+                window.location.reload(); 
               }
-              onUpdateIndex={(idx) =>
-                setPosts((prev) =>
-                  prev.map((p) =>
-                    p.id === post.id ? { ...p, lastIndex: idx } : p,
-                  ),
-                )
-              }
-              isPlaying={playingPostId === post.id}
-              onVolumeChange={setVolume}
-            />
-          ))}
-        </main>
-        <RightSidebar />
+            }}
+            className="bg-slate-800 text-white px-4 py-2 rounded hover:bg-slate-700 transition cursor-pointer"
+          >
+            시작하기
+          </button>
+
+          <button
+            onClick={async () => {
+              await signOut(auth);
+              window.location.reload();
+            }}
+            className="bg-slate-200 text-slate-600 px-4 py-2 rounded hover:bg-slate-300 transition cursor-pointer"
+          >
+            돌아가기
+          </button>
+        </div>
       </div>
-      {viewer.isOpen && (
-        <MediaViewer
-          mediaList={viewer.list}
-          initialIndex={viewer.index}
-          volume={volume}
-          onVolumeChange={setVolume}
-          onClose={(lastIdx) => {
-            setPosts((prev) =>
-              prev.map((p) =>
-                p.id === viewer.postId ? { ...p, lastIndex: lastIdx } : p,
-              ),
-            );
-            setViewer({ ...viewer, isOpen: false });
-          }}
-        />
-      )}
-      {isModalOpen && (
-        <PostForm
-          onSubmit={handleCreatePost}
-          onClose={() => setIsModalOpen(false)}
-        />
-      )}
+    );
+  }
+
+  // 2. 로그인 안 했으면 로그인 화면, 했으면 메인 화면
+  return !user ? (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#fdfbf7]">
+      <h1 className="text-3xl font-bold mb-8 text-slate-800">우동집</h1>
+      <LoginButtons />
     </div>
+  ) : (
+    <MainContent />
   );
 }
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
+
 export default App;

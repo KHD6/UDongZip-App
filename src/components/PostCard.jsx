@@ -1,79 +1,144 @@
+// src/components/PostCard.jsx
 import React, { useRef, useEffect, useState } from "react";
+import PostHeader from "./PostHeader";
+import PostBody from "./PostBody";
+import PostFooter from "./PostFooter";
+import { auth, db, storage } from "../firebase";
+import {
+  deleteDoc,
+  doc,
+  collection,
+  query,
+  where,
+  getDocs,
+  writeBatch,
+} from "firebase/firestore";
+import { ref, deleteObject } from "firebase/storage";
+import Comments from "./Comments";
 
-function PostCard({ nickname, content, mediaList, onOpenViewer, initialIndex, onUpdateIndex, isPlaying, onVisibilityChange, onHoverStateChange }) {
-  const containerRef = useRef(null);
+function PostCard({
+  nickname,
+  email,
+  photoURL,
+  content,
+  createdAt,
+  mediaList,
+  onOpenViewer,
+  initialIndex,
+  onUpdateIndex,
+  onVisibilityChange,
+  onHoverStateChange,
+  isPlaying,
+  uid,
+  id,
+}) {
   const cardRef = useRef(null);
   const videoRefs = useRef([]);
   const [currentIndex, setCurrentIndex] = useState(initialIndex || 0);
 
-  const hasMedia = mediaList && mediaList.length > 0;
+  const handleDelete = async () => {
+    if (window.confirm("정말 삭제하시겠습니까?")) {
+      try {
+        // 1. Storage 파일 삭제
+        if (mediaList && mediaList.length > 0) {
+          for (const item of mediaList) {
+            if (item.path) {
+              await deleteObject(ref(storage, item.path)).catch(() => {});
+            }
+          }
+        }
+
+        const batch = writeBatch(db);
+
+        // 2. 좋아요 삭제
+        const likesQuery = query(
+          collection(db, "likes"),
+          where("postId", "==", id),
+        );
+        const likesSnapshot = await getDocs(likesQuery);
+        likesSnapshot.forEach((docSnap) => batch.delete(docSnap.ref));
+
+        // 3. 댓글 삭제
+        const commentsQuery = query(
+          collection(db, "comments"),
+          where("postId", "==", id),
+        );
+        const commentsSnapshot = await getDocs(commentsQuery);
+        commentsSnapshot.forEach((docSnap) => batch.delete(docSnap.ref));
+
+        // 4. 게시글 삭제
+        batch.delete(doc(db, "posts", id));
+
+        await batch.commit(); // 한 번만 호출
+        window.location.reload();
+      } catch (error) {
+        console.error("삭제 과정 오류 상세:", error);
+        alert(`삭제 중 오류가 발생했습니다: ${error.message}`);
+      }
+    }
+  };
 
   useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => { if (entry.isIntersecting) onVisibilityChange(true); });
-    }, { threshold: 0.6 });
+    if (!mediaList) return;
+    videoRefs.current.forEach((video, idx) => {
+      if (!video) return;
+      // !?수정된 내용?!: isPlaying이 정의되었으므로 이제 정상 작동합니다.
+      if (isPlaying && idx === currentIndex) {
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+        video.currentTime = 0;
+      }
+    });
+  }, [isPlaying, currentIndex, mediaList]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) onVisibilityChange(true);
+        });
+      },
+      { threshold: 0.6 },
+    );
     if (cardRef.current) observer.observe(cardRef.current);
     return () => observer.disconnect();
   }, [onVisibilityChange]);
 
-  useEffect(() => {
-    setCurrentIndex(initialIndex || 0);
-    if (containerRef.current) containerRef.current.scrollLeft = containerRef.current.clientWidth * (initialIndex || 0);
-  }, [initialIndex]);
-
-  useEffect(() => {
-    if (!hasMedia) return;
-    videoRefs.current.forEach((video, idx) => {
-      if (!video) return;
-      if (isPlaying && idx === currentIndex) video.play().catch(() => {});
-      else { video.pause(); video.currentTime = 0; }
-    });
-  }, [isPlaying, currentIndex, hasMedia]);
-
-  const handleNav = (newIdx) => {
-    if (newIdx < 0 || newIdx >= mediaList.length) return;
-    setCurrentIndex(newIdx);
-    onUpdateIndex(newIdx);
-    if (containerRef.current) containerRef.current.scrollLeft = containerRef.current.clientWidth * newIdx;
-  };
+  const displayName = nickname || "";
+  const finalName =
+    displayName !== "익명의 집사" && displayName !== ""
+      ? displayName
+      : email === "익명의 집사"
+        ? "익명의 집사"
+        : email?.split("@")[0];
 
   return (
-    <article ref={cardRef} className="bg-white p-6 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 transition-all hover:shadow-[0_8px_30px_rgba(230,210,210,0.2)]"
-             onMouseEnter={() => onHoverStateChange(true)} onMouseLeave={() => onHoverStateChange(false)}>
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-slate-100"></div>
-        <span className="font-bold text-slate-700">{nickname}</span>
-      </div>
-      
-      {hasMedia && (
-        <div className="aspect-video bg-slate-50 rounded-2xl relative group overflow-hidden mb-4">
-          {/* 인덱스 표시 배지 (복구 완료: 1/4 형태) */}
-          <div className="absolute top-4 right-4 z-20 bg-black/40 backdrop-blur-md text-white text-xs px-2 py-1 rounded-full">
-            {currentIndex + 1} / {mediaList.length}
-          </div>
-
-          <div ref={containerRef} className="w-full h-full flex overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-            {mediaList.map((item, idx) => (
-              <div key={idx} className="w-full h-full shrink-0 snap-center relative cursor-pointer" onClick={() => onOpenViewer(idx)}>
-                {item.type === "video" ? (
-                  <video ref={el => videoRefs.current[idx] = el} src={item.url} muted loop playsInline className="w-full h-full object-cover" />
-                ) : (
-                  <img src={item.url} className="w-full h-full object-cover" alt="" />
-                )}
-              </div>
-            ))}
-          </div>
-
-          {currentIndex > 0 && (
-            <button className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-md z-10" onClick={(e) => { e.stopPropagation(); handleNav(currentIndex - 1); }}>〈</button>
-          )}
-          {currentIndex < mediaList.length - 1 && (
-            <button className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-md z-10" onClick={(e) => { e.stopPropagation(); handleNav(currentIndex + 1); }}>〉</button>
-          )}
-        </div>
-      )}
-      
-      <div className="text-slate-600 leading-relaxed whitespace-pre-line">{content}</div>
+    <article
+      ref={cardRef}
+      className="bg-white p-6 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100"
+      onMouseEnter={() => onHoverStateChange(true)}
+      onMouseLeave={() => onHoverStateChange(false)}
+    >
+      <PostHeader
+        nickname={finalName}
+        photoURL={photoURL}
+        isOwner={auth.currentUser?.uid === uid}
+        onDelete={handleDelete}
+        onEdit={() => alert("수정 기능 구현 예정")}
+      />
+      <PostBody
+        content={content}
+        mediaList={mediaList}
+        currentIndex={currentIndex}
+        videoRefs={videoRefs}
+        onOpenViewer={onOpenViewer}
+        onUpdateIndex={(idx) => {
+          setCurrentIndex(idx);
+          onUpdateIndex(idx);
+        }}
+      />
+      <PostFooter createdAt={createdAt} postId={id} />
     </article>
   );
 }
