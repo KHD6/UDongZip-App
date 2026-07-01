@@ -1,30 +1,54 @@
 import React from "react";
-import { useAuth } from "../context/AuthContext";
+import { Link, useLocation } from "react-router-dom";
+import { NAV_ITEMS } from "../constants/navigation";
 
-function Sidebar({ onOpenModal }) { // onOpenModal 다시 추가
-  const { logout } = useAuth();
+function Sidebar({ onNewPostClick }) {
+  const location = useLocation();
+  const currentPath = location.pathname;
 
   return (
-    <aside className="w-full md:w-64 p-6 border-r border-slate-200 sticky top-0 md:h-screen flex flex-row md:flex-col justify-between items-center md:items-start">
-      <h1 className="text-2xl font-bold text-slate-700 tracking-tight">
-        우동집
-      </h1>
+    <div className="hidden md:flex flex-col w-64 h-screen sticky top-0 p-6 justify-between border-r border-slate-100 bg-white z-50">
+      <div className="space-y-10">
+        {/* 로고 */}
+        <Link to="/" className="block text-2xl font-bold text-slate-800 tracking-wide px-3">
+          우동집
+        </Link>
 
-      {/* 데스크탑에서만 보이는 버튼 */}
-      <button
-        onClick={onOpenModal}
-        className="hidden md:block w-full bg-slate-800 text-white py-2 rounded-lg hover:bg-slate-700 transition"
-      >
-        새 기록
-      </button>
+        {/* 시맨틱 nav 영역 */}
+        <nav className="space-y-1">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = currentPath === item.path;
+            
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                  isActive
+                    ? "bg-slate-900 text-white shadow-md shadow-slate-950/10"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                }`}
+              >
+                <Icon size={20} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
 
-      <button
-        onClick={logout}
-        className="text-slate-500 hover:text-red-500 text-sm transition"
-      >
-        로그아웃
-      </button>
-    </aside>
+        {/* 🌟 새 기록 버튼 (cursor-pointer 추가) */}
+        <button 
+          onClick={onNewPostClick}
+          className="w-full bg-[#1e293b] text-white py-3 rounded-xl font-medium shadow-sm hover:bg-slate-800 transition-colors cursor-pointer"
+        >
+          새 기록
+        </button>
+      </div>
+
+      <div className="text-xs text-slate-300 px-4">© 2026 우동집</div>
+    </div>
   );
 }
+
 export default Sidebar;
