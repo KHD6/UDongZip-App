@@ -27,7 +27,7 @@ function Sidebar({ onNewPostClick }) {
       <div className="mt-6 w-full flex justify-center px-2">
         <button
           onClick={onNewPostClick}
-          className="w-12 h-12 xl:w-48 xl:h-12 bg-[#1a2333] text-white rounded-full flex items-center justify-center transition-all duration-300 shadow-md"
+          className="w-12 h-12 xl:w-48 xl:h-12 bg-[#1a2333] text-white rounded-full flex items-center justify-center transition-all duration-300 shadow-md cursor-pointer"
         >
           <span className="xl:hidden text-2xl font-bold">+</span>
           <span className="hidden xl:inline font-semibold">새 기록</span>

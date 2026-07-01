@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { db, auth } from "./firebase";
-import { getDoc, doc } from "firebase/firestore";
+import { getDoc, doc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 
 import Sidebar from "./components/Sidebar";
 import MainContent from "./components/MainContent";
@@ -13,7 +13,6 @@ import LoginButtons from "./components/LoginButtons";
 import NicknameSetupModal from "./components/NicknameSetupModal";
 import PostForm from "./components/PostForm";
 
-// 페이지 컴포넌트들
 const AIRecommendPage = () => <div className="p-4">🤖 AI 페이지</div>;
 const MapPage = () => <div className="p-4">📍 지도 페이지</div>;
 const ProfilePage = () => <div className="p-4">👤 프로필 페이지</div>;
@@ -46,6 +45,22 @@ function AppContent() {
     setIsWriteModalOpen(true);
   };
 
+  const handleSavePost = async (postData) => {
+    try {
+      await addDoc(collection(db, "posts"), {
+        content: postData.content,
+        mediaList: postData.mediaList,
+        uid: auth.currentUser.uid,
+        createdAt: serverTimestamp(),
+      });
+      setRefreshKey((prev) => prev + 1);
+      setIsWriteModalOpen(false);
+    } catch (error) {
+      console.error("게시글 저장 실패:", error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     if (!user) { setLoading(false); return; }
     const checkNickname = async () => {
@@ -62,41 +77,32 @@ function AppContent() {
   if (!user) return <div className="flex flex-col items-center justify-center min-h-screen"><LoginButtons /></div>;
 
   return (
-  <div className="min-h-screen bg-[#fdfbf7] w-full relative">
-    {/* 1. 사이드바: 반응형 너비 적용 (기본 80px -> md:100px -> xl:275px) */}
-    <div className="hidden md:block fixed left-0 top-0 h-full w-[100px] xl:w-[220px] bg-[#f3f0e8] transition-all duration-300 z-50">
-      <Sidebar onNewPostClick={handleOpenWriteModal} />
-    </div>
-
-    {/* 2. 메인 컨텐츠 영역: xl 사이즈일 때 275px만큼 밀어냄 */}
-    <div className="md:ml-[100px] xl:ml-[220px] min-h-screen flex justify-center px-4 transition-all duration-300">
-      
-      {/* 중앙 컨텐츠 덩어리 */}
-      <div className="flex w-full max-w-[950px] justify-center lg:justify-start">
-        <main className="w-full max-w-[600px] border-x border-slate-100 min-h-screen pb-20 md:pb-0">
-          <Routes>
-            <Route path="/" element={<MainContent refreshKey={refreshKey} onOpenWriteModal={handleOpenWriteModal} />} />
-            <Route path="/recommend" element={<AIRecommendPage />} />
-            <Route path="/map" element={<MapPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/post/:postId" element={<PostDetailPage />} />
-            <Route path="/profile/:uid" element={<ProfilePage />} />
-          </Routes>
-        </main>
-
-        <aside className="hidden lg:block w-[350px] pl-8 py-4">
-          <div className="sticky top-4">
-            <RightSidebar />
-          </div>
-        </aside>
+    <div className="min-h-screen bg-[#fdfbf7] w-full relative">
+      <div className="hidden md:block fixed left-0 top-0 h-full w-[100px] xl:w-[220px] bg-[#f3f0e8] transition-all duration-300 z-50">
+        <Sidebar onNewPostClick={handleOpenWriteModal} />
       </div>
-    </div>
 
-    <BottomNav />
-
+      <div className="md:ml-[100px] xl:ml-[220px] min-h-screen flex justify-center px-4 transition-all duration-300">
+        <div className="flex w-full max-w-[950px] justify-center lg:justify-start">
+          <main className="w-full max-w-[600px] border-x border-slate-100 min-h-screen pb-20 md:pb-0">
+            <Routes>
+              <Route path="/" element={<MainContent refreshKey={refreshKey} onOpenWriteModal={handleOpenWriteModal} />} />
+              <Route path="/recommend" element={<AIRecommendPage />} />
+              <Route path="/map" element={<MapPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/post/:postId" element={<PostDetailPage />} />
+              <Route path="/profile/:uid" element={<ProfilePage />} />
+            </Routes>
+          </main>
+          <aside className="hidden lg:block w-[350px] pl-8 py-4">
+            <div className="sticky top-4"><RightSidebar /></div>
+          </aside>
+        </div>
+      </div>
+      <BottomNav />
       {isWriteModalOpen && (
         <PostForm
-          onSubmit={async () => { setIsWriteModalOpen(false); }}
+          onSubmit={handleSavePost}
           onClose={() => setIsWriteModalOpen(false)}
         />
       )}

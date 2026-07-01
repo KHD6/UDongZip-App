@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { storage } from "../firebase";
+import { storage, auth } from "../firebase"; // auth를 import합니다.
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 function PostForm({ onSubmit, onClose }) {
@@ -23,24 +23,28 @@ function PostForm({ onSubmit, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // 로그인 체크
+    if (!auth.currentUser) {
+      alert("로그인이 필요한 기능입니다.");
+      return;
+    }
+    
     if (!content.trim() && mediaList.length === 0) return;
 
     setIsUploading(true);
 
     try {
-      // 1. 모든 파일을 Storage에 업로드하고 주소와 경로를 함께 받아오기
       const uploadedMediaList = await Promise.all(
         mediaList.map(async (item) => {
           if (!item.file) return item;
 
-          // 파일명에 고유 ID 부여
           const fileName = `${crypto.randomUUID()}_${item.file.name}`;
           const storageRef = ref(storage, `posts/${fileName}`);
 
           await uploadBytes(storageRef, item.file);
           const url = await getDownloadURL(storageRef);
 
-          // !!추가된 내용!!: url뿐만 아니라 storageRef.fullPath(경로)를 함께 반환합니다.
           return { 
             url, 
             type: item.type, 
@@ -49,12 +53,18 @@ function PostForm({ onSubmit, onClose }) {
         })
       );
 
-      // 2. 결과 전달
-      onSubmit({ content, mediaList: uploadedMediaList });
+      // 데이터 저장 시 uid를 확실히 포함해서 넘깁니다.
+      await onSubmit({ 
+        content, 
+        mediaList: uploadedMediaList,
+        uid: auth.currentUser.uid,
+        createdAt: new Date()
+      });
+      
       onClose();
     } catch (error) {
       console.error("업로드 실패:", error);
-      alert("파일 업로드 중 오류가 발생했습니다.");
+      alert("데이터 저장 중 오류가 발생했습니다: " + error.message);
     } finally {
       setIsUploading(false);
     }

@@ -18,26 +18,35 @@ export default function Comments({ postId, onClose }) {
     return () => unsubscribe();
   }, [postId]);
 
+  useEffect(() => {
+    // 스크롤 방지 로직 (보다 안정적인 방식)
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!text.trim()) return;
-
     try {
-      const targetParentId = replyTo ? (replyTo.parentId || replyTo.id) : null;
+      const targetParentId = replyTo ? replyTo.parentId || replyTo.id : null;
       await addDoc(collection(db, "comments"), {
-        postId,
-        text,
-        parentId: targetParentId,
+        postId, text, parentId: targetParentId,
         uid: auth.currentUser.uid,
         nickname: auth.currentUser.displayName || "익명의 집사",
         photoURL: auth.currentUser.photoURL || null,
         createdAt: serverTimestamp(),
       });
-      setText("");
-      setReplyTo(null);
-    } catch (error) {
-      console.error("댓글 작성 실패:", error);
-    }
+      setText(""); setReplyTo(null);
+    } catch (error) { console.error("댓글 작성 실패:", error); }
   };
 
   const handleReplyClick = (comment) => {
@@ -51,30 +60,24 @@ export default function Comments({ postId, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[1000] flex items-end sm:items-center justify-center">
-      <div className="bg-white w-full h-[95vh] sm:h-[80vh] sm:max-w-lg sm:rounded-2xl flex flex-col overflow-hidden transition-all">
+      <div className="bg-white w-full h-[95vh] sm:h-[80vh] sm:max-w-lg sm:rounded-2xl flex flex-col overflow-hidden">
         <div className="flex justify-between items-center px-6 py-4 border-b">
           <h3 className="font-bold text-slate-700">댓글</h3>
           <button onClick={onClose} className="text-slate-400">✕</button>
         </div>
-
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {parentComments.map((parent) => {
             const replies = comments.filter((r) => r.parentId === parent.id);
             const isExpanded = expandedParents[parent.id];
-
             return (
               <div key={parent.id} className="space-y-4">
                 <CommentItem comment={parent} onReply={handleReplyClick} isReply={false} />
-                
                 {replies.length > 0 && (
-                  <button
-                    onClick={() => setExpandedParents(prev => ({ ...prev, [parent.id]: !prev[parent.id] }))}
-                    className="ml-10 text-xs font-bold text-blue-500 hover:text-blue-600"
-                  >
+                  <button onClick={() => setExpandedParents(prev => ({ ...prev, [parent.id]: !prev[parent.id] }))} 
+                    className="ml-10 text-xs font-bold text-blue-500 hover:text-blue-600">
                     {isExpanded ? `▲ 답글 ${replies.length}개 숨기기` : `▼ 답글 ${replies.length}개 보기`}
                   </button>
                 )}
-
                 {isExpanded && replies.map((reply) => (
                   <CommentItem key={reply.id} comment={reply} onReply={handleReplyClick} isReply={true} />
                 ))}
@@ -82,7 +85,6 @@ export default function Comments({ postId, onClose }) {
             );
           })}
         </div>
-
         <div className="p-4 border-t bg-white">
           {replyTo && (
             <div className="px-2 py-1 mb-2 text-xs flex justify-between bg-slate-50 rounded">
