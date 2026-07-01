@@ -1,20 +1,22 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
+// Vite 환경 변수에서 Firebase 설정값 로드
 const firebaseConfig = {
-  apiKey: "AIzaSyCZ3v-mtjL0fFckFXEPeXLU7pMqdju0YvQ", 
-  authDomain: "udongzip-app.firebaseapp.com",
-  projectId: "udongzip-app",
-  storageBucket: "udongzip-app.firebasestorage.app",
-  messagingSenderId: "872042142957",
-  appId: "1:872042142957:web:0f7d912e75ecf38ac200e4",
-  measurementId: "G-JDDMLJ2V28"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
+// Firebase 초기화
 const app = initializeApp(firebaseConfig);
 
+// 다른 컴포넌트에서 사용할 인스턴스 내보내기
 export const db = getFirestore(app);
-export const storage = getStorage(app);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
