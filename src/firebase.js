@@ -20,3 +20,12 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+export const GUEST_NICKNAMES = [
+  "어딘가의 집사",
+  "누군가의 집사",
+  "고양이 캔따개",
+  "댕댕이 발닦개",
+  "길냥이 간식셔틀",
+  "방구석 동물학자"
+];

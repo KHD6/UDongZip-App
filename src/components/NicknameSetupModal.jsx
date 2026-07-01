@@ -1,17 +1,56 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { updateProfile } from "firebase/auth";
-import { db } from "../firebase";
+import { db, GUEST_NICKNAMES } from "../firebase"; // 중앙에서 공유된 닉네임 리스트 임포트
 import { doc, setDoc } from "firebase/firestore";
 
 function NicknameSetupModal({ user }) {
+  
+  useEffect(() => {
+    if (user && user.isAnonymous) {
+      const handleAutoGuestSetup = async () => {
+        try {
+          // 공유 배열에서 랜덤 닉네임 추출
+          const randomNickname = GUEST_NICKNAMES[Math.floor(Math.random() * GUEST_NICKNAMES.length)];
+          
+          // 1. 프로필 업데이트
+          await updateProfile(user, { displayName: randomNickname });
+          
+          // 2. 고도화된 규칙 덕분에 이제 정상적으로 내 문서 작성이 허용됩니다.
+          await setDoc(doc(db, "users", user.uid), { isNicknameSet: true }, { merge: true });
+          
+          // 3. 동기화 새로고침
+          window.location.reload();
+        } catch (error) {
+          console.error("게스트 자동 닉네임 설정 실패:", error);
+        }
+      };
+
+      handleAutoGuestSetup();
+    }
+  }, [user]);
+
   const handleSave = async () => {
     const nick = document.getElementById("nick").value;
     if (nick.trim()) {
-      await updateProfile(user, { displayName: nick });
-      await setDoc(doc(db, "users", user.uid), { isNicknameSet: true }, { merge: true });
-      window.location.reload();
+      try {
+        await updateProfile(user, { displayName: nick });
+        await setDoc(doc(db, "users", user.uid), { isNicknameSet: true }, { merge: true });
+        window.location.reload();
+      } catch (error) {
+        console.error("닉네임 저장 실패:", error);
+      }
     }
   };
+
+  if (user && user.isAnonymous) {
+    return (
+      <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="bg-slate-900/90 text-white text-sm px-6 py-3 rounded-full shadow-lg animate-pulse">
+          🐾 방문자 프로필 구성 중...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50">

@@ -5,27 +5,29 @@ import PostCard from "./PostCard";
 import RightSidebar from "./RightSidebar";
 import PostForm from "./PostForm";
 import MediaViewer from "./MediaViewer";
-import { db, auth } from "../firebase";
-import { 
-  collection, 
-  getDocs, 
-  query, 
-  orderBy, 
-  addDoc 
+import { db, auth, GUEST_NICKNAMES } from "../firebase"; // 닉네임 배열 함께 임포트
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  addDoc,
 } from "firebase/firestore";
 
 function MainContent() {
   const [volume, setVolume] = useState(0.8);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [playingPostId, setPlayingPostId] = useState(null);
-  const [viewer, setViewer] = useState({ 
-    isOpen: false, 
-    list: [], 
-    index: 0, 
-    postId: null, 
-    onClose: null 
+  const [viewer, setViewer] = useState({
+    isOpen: false,
+    list: [],
+    index: 0,
+    postId: null,
+    onClose: null,
   });
   const [posts, setPosts] = useState([]);
+
+  const isGuest = !auth.currentUser || auth.currentUser.isAnonymous;
 
   const fetchPosts = async () => {
     try {
@@ -39,16 +41,31 @@ function MainContent() {
   };
 
   useEffect(() => {
-    fetchPosts();
+    const unsubscribe = auth.onAuthStateChanged(() => {
+      fetchPosts();
+    });
+    return () => unsubscribe();
   }, []);
 
+  const handleOpenModal = () => {
+    if (isGuest) {
+      alert("우동집 정식 집사만 글을 쓸 수 있어요! 구글이나 이메일로 로그인해 주세요.");
+      return;
+    }
+    setIsModalOpen(true);
+  };
+
   const handleCreatePost = async ({ content, mediaList }) => {
+    if (isGuest) return;
+
     try {
+      const getRandomNickname = () => GUEST_NICKNAMES[Math.floor(Math.random() * GUEST_NICKNAMES.length)];
+
       await addDoc(collection(db, "posts"), {
         content,
         mediaList,
         uid: auth.currentUser.uid,
-        nickname: auth.currentUser.displayName || "익명의 집사",
+        nickname: auth.currentUser.displayName || getRandomNickname(),
         photoURL: auth.currentUser.photoURL || null,
         createdAt: new Date(),
       });
@@ -61,7 +78,7 @@ function MainContent() {
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-slate-800 relative">
       <div className="flex flex-col md:flex-row max-w-6xl mx-auto">
-        <Sidebar onOpenModal={() => setIsModalOpen(true)} />
+        <Sidebar onOpenModal={handleOpenModal} />
 
         <main className="flex-1 p-4 md:p-6 space-y-8 pt-14">
           {posts.map((post) => (
@@ -72,22 +89,28 @@ function MainContent() {
               volume={volume}
               isPlaying={playingPostId === post.id}
               onVisibilityChange={(isVisible) => {
-                if (window.matchMedia("(pointer: coarse)").matches && isVisible) setPlayingPostId(post.id);
+                if (window.matchMedia("(pointer: coarse)").matches && isVisible)
+                  setPlayingPostId(post.id);
               }}
               onHoverStateChange={(isHovered) => {
-                if (window.matchMedia("(pointer: fine)").matches) setPlayingPostId(isHovered ? post.id : null);
+                if (window.matchMedia("(pointer: fine)").matches)
+                  setPlayingPostId(isHovered ? post.id : null);
               }}
               onOpenViewer={(idx, onCloseCallback) =>
-                setViewer({ 
-                  isOpen: true, 
-                  list: post.mediaList || [], 
-                  index: idx, 
-                  postId: post.id, 
-                  onClose: onCloseCallback 
+                setViewer({
+                  isOpen: true,
+                  list: post.mediaList || [],
+                  index: idx,
+                  postId: post.id,
+                  onClose: onCloseCallback,
                 })
               }
               onUpdateIndex={(idx) =>
-                setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, lastIndex: idx } : p)))
+                setPosts((prev) =>
+                  prev.map((p) =>
+                    p.id === post.id ? { ...p, lastIndex: idx } : p,
+                  ),
+                )
               }
               onVolumeChange={setVolume}
             />
@@ -98,7 +121,7 @@ function MainContent() {
       </div>
 
       <button
-        onClick={() => setIsModalOpen(true)}
+        onClick={handleOpenModal}
         className="md:hidden fixed bottom-6 right-6 z-[90] w-14 h-14 bg-slate-800 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-slate-700 transition-all active:scale-95"
       >
         <Plus size={28} />
