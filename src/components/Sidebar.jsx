@@ -1,54 +1,39 @@
+// src/components/Sidebar.jsx
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { NAV_ITEMS } from "../constants/navigation";
 
 function Sidebar({ onNewPostClick }) {
-  const location = useLocation();
-  const currentPath = location.pathname;
-
   return (
-    <div className="hidden md:flex flex-col w-64 h-screen sticky top-0 p-6 justify-between border-r border-slate-100 bg-white z-50">
-      <div className="space-y-10">
-        {/* 로고 */}
-        <Link to="/" className="block text-2xl font-bold text-slate-800 tracking-wide px-3">
-          우동집
-        </Link>
+    // w-full을 추가하여 사이드바가 전체 너비를 갖게 하고, items-center로 내부 아이콘/버튼 정렬
+    <div className="flex flex-col h-screen sticky top-0 px-2 py-4 items-center w-full">
+      {/* 로고 영역 */}
+      <div className="p-3 mb-4">🐾</div>
 
-        {/* 시맨틱 nav 영역 */}
-        <nav className="space-y-1">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentPath === item.path;
-            
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                  isActive
-                    ? "bg-slate-900 text-white shadow-md shadow-slate-950/10"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                }`}
-              >
-                <Icon size={20} />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+      <nav className="flex flex-col items-center xl:items-start gap-2 w-full px-2">
+        {NAV_ITEMS.map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            className="flex p-3 w-full justify-center xl:justify-start hover:bg-slate-100 rounded-full"
+          >
+            <item.icon size={26} />
+            <span className="hidden xl:inline ml-4">{item.label}</span>
+          </Link>
+        ))}
+      </nav>
 
-        {/* 🌟 새 기록 버튼 (cursor-pointer 추가) */}
-        <button 
+      {/* 새 기록 버튼: w-full을 기준으로 크기 조절 */}
+      <div className="mt-6 w-full flex justify-center px-2">
+        <button
           onClick={onNewPostClick}
-          className="w-full bg-[#1e293b] text-white py-3 rounded-xl font-medium shadow-sm hover:bg-slate-800 transition-colors cursor-pointer"
+          className="w-12 h-12 xl:w-48 xl:h-12 bg-[#1a2333] text-white rounded-full flex items-center justify-center transition-all duration-300 shadow-md"
         >
-          새 기록
+          <span className="xl:hidden text-2xl font-bold">+</span>
+          <span className="hidden xl:inline font-semibold">새 기록</span>
         </button>
       </div>
-
-      <div className="text-xs text-slate-300 px-4">© 2026 우동집</div>
     </div>
   );
 }
-
 export default Sidebar;
