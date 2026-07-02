@@ -1,4 +1,3 @@
-// src/components/BottomNav.jsx
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { NAV_ITEMS } from "../constants/navigation"; // 🌟 동일한 메뉴 데이터 공유

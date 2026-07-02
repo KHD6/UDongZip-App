@@ -1,28 +1,29 @@
+// src/components/PostCard.jsx
 import React, { useRef, useEffect, useState } from "react";
 import PostHeader from "./PostHeader";
 import PostBody from "./PostBody";
 import PostFooter from "./PostFooter";
 import { auth, db, storage } from "../firebase";
 import { collection, query, where, getDocs, writeBatch, doc } from "firebase/firestore";
-import { ref, deleteObject } from "firebase/storage";
 import { useKeyPress } from "../hooks/useKeyPress";
+import { ref, deleteObject } from "firebase/storage";
 
 function PostCard({
   nickname, email, photoURL, content, createdAt, mediaList,
   onOpenViewer, initialIndex, onUpdateIndex,
-  onVisibilityChange, onHoverStateChange, isPlaying, uid, id, user_handle
+  onVisibilityChange = () => {},
+  onHoverStateChange = () => {},
+  isPlaying, uid, id, user_handle
 }) {
   const cardRef = useRef(null);
   const videoRefs = useRef([]);
   const [currentIndex, setCurrentIndex] = useState(initialIndex || 0);
 
   useEffect(() => {
-    console.log("isPlaying:", isPlaying, "currentIndex:", currentIndex);
     if (!mediaList) return;
     videoRefs.current.forEach((video, idx) => {
       if (!video) return;
       if (isPlaying && idx === currentIndex) {
-        console.log("영상 재생 시도");
         video.play().catch((e) => console.log("재생 실패:", e));
       } else {
         video.pause();
@@ -30,7 +31,6 @@ function PostCard({
     });
   }, [isPlaying, currentIndex, mediaList]);
 
-  // 1. handleDelete 함수를 가장 먼저 선언
   const handleDelete = async () => {
     if (window.confirm("정말 삭제하시겠습니까?")) {
       try {
@@ -40,35 +40,41 @@ function PostCard({
           }
         }
         const batch = writeBatch(db);
+        
+        // 1. 좋아요 삭제
         const likesSnapshot = await getDocs(query(collection(db, "likes"), where("postId", "==", id)));
         likesSnapshot.forEach((docSnap) => batch.delete(docSnap.ref));
         
+        // 2. 댓글 삭제
         const commentsSnapshot = await getDocs(query(collection(db, "comments"), where("postId", "==", id)));
         commentsSnapshot.forEach((docSnap) => batch.delete(docSnap.ref));
 
-        batch.delete(doc(db, "posts", id));
+        // 3. 게시글 삭제 (문법 수정)
+        batch.delete(doc(db, "posts", id)); 
+        
         await batch.commit();
         window.location.reload();
       } catch (error) {
+        console.error("삭제 오류 상세:", error);
         alert(`삭제 중 오류 발생: ${error.message}`);
       }
     }
   };
 
-  // 2. 뷰어 핸들러
   const handleOpenViewer = () => {
-    onOpenViewer(currentIndex, (lastIndex) => {
-      setCurrentIndex(lastIndex);
-      onUpdateIndex(lastIndex);
-    });
+    if (onOpenViewer) {
+      onOpenViewer(currentIndex, (lastIndex) => {
+        setCurrentIndex(lastIndex);
+        onUpdateIndex(lastIndex);
+      });
+    }
   };
 
   const handleUpdate = (newIdx) => {
     setCurrentIndex(newIdx);
-    onUpdateIndex(newIdx);
+    if (onUpdateIndex) onUpdateIndex(newIdx);
   };
 
-  // 3. 키보드 훅
   useKeyPress("ArrowLeft", () => currentIndex > 0 && handleUpdate(currentIndex - 1), isPlaying);
   useKeyPress("ArrowRight", () => currentIndex < mediaList.length - 1 && handleUpdate(currentIndex + 1), isPlaying);
 

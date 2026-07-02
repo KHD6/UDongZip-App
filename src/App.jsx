@@ -11,10 +11,10 @@ import PostDetailPage from "./pages/PostDetailPage";
 import LoginButtons from "./components/LoginButtons";
 import NicknameSetupModal from "./components/NicknameSetupModal";
 import PostForm from "./components/PostForm";
+import ProfilePage from "./pages/ProfilePage";
 
 const AIRecommendPage = () => <div className="p-4">🤖 AI 페이지</div>;
 const MapPage = () => <div className="p-4">📍 지도 페이지</div>;
-const ProfilePage = () => <div className="p-4">👤 프로필 페이지</div>;
 
 const SettingsPage = () => {
   const handleLogout = () => {
