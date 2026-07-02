@@ -15,7 +15,6 @@ function NicknameSetupModal({ user }) {
       const handleAutoGuestSetup = async () => {
         try {
           const randomNickname = GUEST_NICKNAMES[Math.floor(Math.random() * GUEST_NICKNAMES.length)];
-          // 게스트는 uid의 뒷자리를 활용해 고유 핸들 자동 생성 (예: guest_b7f2a1)
           const guestHandle = `guest_${user.uid.slice(-6).toLowerCase()}`;
           
           await updateProfile(user, { displayName: randomNickname });
@@ -24,6 +23,7 @@ function NicknameSetupModal({ user }) {
             uid: user.uid,
             displayName: randomNickname,
             user_handle: guestHandle,
+            photoURL: "/default-profile.png", // 게스트는 기본 이미지 강제 지정
             isNicknameSet: true,
             isAnonymous: true,
             updatedAt: new Date().toISOString()
@@ -61,7 +61,7 @@ function NicknameSetupModal({ user }) {
       return;
     }
 
-    setIsSubmitting(false);
+    setIsSubmitting(true);
     setStatusMessage("고유 아이디 중복 확인 중...");
     setStatusColor("text-blue-500");
 
@@ -81,16 +81,21 @@ function NicknameSetupModal({ user }) {
       if (isDuplicate) {
         setStatusMessage("이미 사용 중인 고유 아이디입니다.");
         setStatusColor("text-red-500");
+        setIsSubmitting(false);
         return;
       }
 
       // 2. Auth 프로필 및 Firestore 유저 도큐먼트 통합 갱신
+      // 구글 로그인 유저의 photoURL을 명확히 확보하여 함께 적재 보장
+      const currentUserPhoto = user.photoURL || "/default-profile.png";
+
       await updateProfile(user, { displayName: nick.trim() });
       
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         displayName: nick.trim(),
         user_handle: handle.trim(),
+        photoURL: currentUserPhoto, // 데이터 누락 원천 차단
         isNicknameSet: true,
         isAnonymous: false,
         updatedAt: new Date().toISOString()
@@ -123,7 +128,6 @@ function NicknameSetupModal({ user }) {
         <p className="text-xs text-slate-500 mb-5">서비스 이용을 위해 닉네임과 고유 아이디를 지정해 주세요.</p>
         
         <form onSubmit={handleSave} className="flex flex-col gap-4">
-          {/* 일반 표시 닉네임 입력란 */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-700">사용자 닉네임</label>
             <input
@@ -136,7 +140,6 @@ function NicknameSetupModal({ user }) {
             />
           </div>
 
-          {/* 고유 식별 핸들 입력란 */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-700">고유 식별 아이디 (@handle)</label>
             <div className="relative flex items-center">

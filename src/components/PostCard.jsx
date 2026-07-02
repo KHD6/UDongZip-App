@@ -1,4 +1,3 @@
-// src/components/PostCard.jsx
 import React, { useRef, useEffect, useState } from "react";
 import PostHeader from "./PostHeader";
 import PostBody from "./PostBody";
@@ -11,25 +10,25 @@ import { useKeyPress } from "../hooks/useKeyPress";
 function PostCard({
   nickname, email, photoURL, content, createdAt, mediaList,
   onOpenViewer, initialIndex, onUpdateIndex,
-  onVisibilityChange, onHoverStateChange, isPlaying, uid, id,
+  onVisibilityChange, onHoverStateChange, isPlaying, uid, id, user_handle
 }) {
   const cardRef = useRef(null);
   const videoRefs = useRef([]);
   const [currentIndex, setCurrentIndex] = useState(initialIndex || 0);
 
   useEffect(() => {
-  console.log("isPlaying:", isPlaying, "currentIndex:", currentIndex);
-  if (!mediaList) return;
-  videoRefs.current.forEach((video, idx) => {
-    if (!video) return;
-    if (isPlaying && idx === currentIndex) {
-      console.log("영상 재생 시도");
-      video.play().catch((e) => console.log("재생 실패:", e));
-    } else {
-      video.pause();
-    }
-  });
-}, [isPlaying, currentIndex, mediaList]);
+    console.log("isPlaying:", isPlaying, "currentIndex:", currentIndex);
+    if (!mediaList) return;
+    videoRefs.current.forEach((video, idx) => {
+      if (!video) return;
+      if (isPlaying && idx === currentIndex) {
+        console.log("영상 재생 시도");
+        video.play().catch((e) => console.log("재생 실패:", e));
+      } else {
+        video.pause();
+      }
+    });
+  }, [isPlaying, currentIndex, mediaList]);
 
   // 1. handleDelete 함수를 가장 먼저 선언
   const handleDelete = async () => {
@@ -80,7 +79,14 @@ function PostCard({
       onMouseEnter={() => onHoverStateChange(true)}
       onMouseLeave={() => onHoverStateChange(false)}
     >
-      <PostHeader nickname={nickname} photoURL={photoURL} isOwner={auth.currentUser?.uid === uid} onDelete={handleDelete} />
+      <PostHeader 
+        nickname={nickname} 
+        photoURL={photoURL} 
+        isOwner={auth.currentUser?.uid === uid} 
+        onDelete={handleDelete}
+        uid={uid}
+        user_handle={user_handle}
+      />
       <PostBody
         content={content}
         mediaList={mediaList}

@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import PostCard from "./PostCard";
 import MediaViewer from "./MediaViewer";
 import { db, auth } from "../firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, doc, getDoc } from "firebase/firestore";
 
 function MainContent({ refreshKey, onOpenWriteModal }) {
   const [volume, setVolume] = useState(0.8);
@@ -15,8 +15,39 @@ function MainContent({ refreshKey, onOpenWriteModal }) {
     try {
       const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setPosts(data);
+      
+      const rawPosts = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const userCache = {};
+      
+      const enrichedPosts = await Promise.all(
+        rawPosts.map(async (post) => {
+          if (!post.uid) return post;
+
+          if (!userCache[post.uid]) {
+            const userDocSnap = await getDoc(doc(db, "users", post.uid));
+            if (userDocSnap.exists()) {
+              userCache[post.uid] = userDocSnap.data();
+            } else {
+              userCache[post.uid] = null;
+            }
+          }
+
+          const userData = userCache[post.uid];
+          
+          // 본인 작성 글일 때 Auth 객체 최후방 폴백 추가 (구글 프로필 완벽 방어)
+          const isMe = auth.currentUser && auth.currentUser.uid === post.uid;
+          const fallbackPhoto = isMe ? auth.currentUser.photoURL : null;
+
+          return {
+            ...post,
+            nickname: userData?.displayName || post.nickname || (isMe ? auth.currentUser.displayName : "이름 없음"),
+            photoURL: userData?.photoURL || post.photoURL || post.userPhotoURL || fallbackPhoto || "/default-profile.png",
+            user_handle: userData?.user_handle || ""
+          };
+        })
+      );
+
+      setPosts(enrichedPosts);
     } catch (error) {
       console.error("데이터 로딩 실패:", error);
     }
