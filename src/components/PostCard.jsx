@@ -4,16 +4,33 @@ import PostHeader from "./PostHeader";
 import PostBody from "./PostBody";
 import PostFooter from "./PostFooter";
 import { auth, db, storage } from "../firebase";
-import { collection, query, where, getDocs, writeBatch, doc } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  writeBatch,
+  doc,
+} from "firebase/firestore";
 import { useKeyPress } from "../hooks/useKeyPress";
 import { ref, deleteObject } from "firebase/storage";
 
 function PostCard({
-  nickname, email, photoURL, content, createdAt, mediaList,
-  onOpenViewer, initialIndex, onUpdateIndex,
+  nickname,
+  email,
+  photoURL,
+  content,
+  createdAt,
+  mediaList,
+  onOpenViewer,
+  initialIndex,
+  onUpdateIndex,
   onVisibilityChange = () => {},
   onHoverStateChange = () => {},
-  isPlaying, uid, id, user_handle
+  isPlaying,
+  uid,
+  id,
+  user_handle,
 }) {
   const cardRef = useRef(null);
   const videoRefs = useRef([]);
@@ -21,12 +38,26 @@ function PostCard({
 
   useEffect(() => {
     if (!mediaList) return;
+
     videoRefs.current.forEach((video, idx) => {
       if (!video) return;
+
       if (isPlaying && idx === currentIndex) {
-        video.play().catch((e) => console.log("재생 실패:", e));
+        // play()는 프로미스를 반환하므로 예외를 잡아주어야 합니다.
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {}) // 재생 성공 시
+            .catch((error) => {
+              // 중단된 재생 요청은 무시하거나 로그만 남김
+              console.log("자동 재생 대기 중 중단됨:", error.message);
+            });
+        }
       } else {
-        video.pause();
+        // 이미 멈춰있는 영상에 pause()를 호출하지 않도록 조건 추가
+        if (!video.paused) {
+          video.pause();
+        }
       }
     });
   }, [isPlaying, currentIndex, mediaList]);
@@ -36,22 +67,27 @@ function PostCard({
       try {
         if (mediaList?.length > 0) {
           for (const item of mediaList) {
-            if (item.path) await deleteObject(ref(storage, item.path)).catch(() => {});
+            if (item.path)
+              await deleteObject(ref(storage, item.path)).catch(() => {});
           }
         }
         const batch = writeBatch(db);
-        
+
         // 1. 좋아요 삭제
-        const likesSnapshot = await getDocs(query(collection(db, "likes"), where("postId", "==", id)));
+        const likesSnapshot = await getDocs(
+          query(collection(db, "likes"), where("postId", "==", id)),
+        );
         likesSnapshot.forEach((docSnap) => batch.delete(docSnap.ref));
-        
+
         // 2. 댓글 삭제
-        const commentsSnapshot = await getDocs(query(collection(db, "comments"), where("postId", "==", id)));
+        const commentsSnapshot = await getDocs(
+          query(collection(db, "comments"), where("postId", "==", id)),
+        );
         commentsSnapshot.forEach((docSnap) => batch.delete(docSnap.ref));
 
         // 3. 게시글 삭제 (문법 수정)
-        batch.delete(doc(db, "posts", id)); 
-        
+        batch.delete(doc(db, "posts", id));
+
         await batch.commit();
         window.location.reload();
       } catch (error) {
@@ -75,8 +111,16 @@ function PostCard({
     if (onUpdateIndex) onUpdateIndex(newIdx);
   };
 
-  useKeyPress("ArrowLeft", () => currentIndex > 0 && handleUpdate(currentIndex - 1), isPlaying);
-  useKeyPress("ArrowRight", () => currentIndex < mediaList.length - 1 && handleUpdate(currentIndex + 1), isPlaying);
+  useKeyPress(
+    "ArrowLeft",
+    () => currentIndex > 0 && handleUpdate(currentIndex - 1),
+    isPlaying,
+  );
+  useKeyPress(
+    "ArrowRight",
+    () => currentIndex < mediaList.length - 1 && handleUpdate(currentIndex + 1),
+    isPlaying,
+  );
 
   return (
     <article
@@ -85,10 +129,10 @@ function PostCard({
       onMouseEnter={() => onHoverStateChange(true)}
       onMouseLeave={() => onHoverStateChange(false)}
     >
-      <PostHeader 
-        nickname={nickname} 
-        photoURL={photoURL} 
-        isOwner={auth.currentUser?.uid === uid} 
+      <PostHeader
+        nickname={nickname}
+        photoURL={photoURL}
+        isOwner={auth.currentUser?.uid === uid}
         onDelete={handleDelete}
         uid={uid}
         user_handle={user_handle}

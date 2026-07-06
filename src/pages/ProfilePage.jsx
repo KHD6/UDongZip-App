@@ -5,14 +5,11 @@ import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebas
 import { auth, db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import PostCard from "../components/PostCard";
-import MediaViewer from "../components/MediaViewer";
 import EditProfileModal from "../components/EditProfileModal";
-
-// Swiper 관련 import
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 
-export default function ProfilePage() {
+export default function ProfilePage({ setViewer, volume, setVolume }) {
   const { uid } = useParams();
   const { fetchProfile } = useAuth();
   const [userData, setUserData] = useState(null);
@@ -20,9 +17,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("feed");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [volume, setVolume] = useState(0.8);
   const [playingPostId, setPlayingPostId] = useState(null);
-  const [viewer, setViewer] = useState({ isOpen: false, list: [], index: 0, postId: null, onClose: null });
 
   const fetchData = async () => {
     setLoading(true);
@@ -46,27 +41,23 @@ export default function ProfilePage() {
   };
 
   useEffect(() => { fetchData(); }, [uid]);
-  const allMediaList = userPosts.flatMap(post => (post.mediaList || []).map(media => ({ ...media, postId: post.id })));
+
+  const allMediaList = userPosts.flatMap(post => 
+    (post.mediaList || []).map(media => ({ ...media, type: media.type || 'image', postId: post.id }))
+  );
 
   if (loading) return <div className="p-8 text-center text-slate-400">🐾 집사 정보를 불러오는 중...</div>;
 
   return (
     <div className="w-full max-w-[600px] mx-auto py-6 px-4 md:px-6">
-      {/* 1. Swiper 적용된 펫 갤러리 */}
       <div className="mb-6">
-        <Swiper
-          slidesPerView="auto"
-          spaceBetween={16}
-          className="w-full"
-        >
+        <Swiper slidesPerView="auto" spaceBetween={16} className="w-full">
           {userData.pets?.map((pet, index) => (
             <SwiperSlide key={index} className="!w-auto">
-              <div className="flex flex-col items-center gap-2 group cursor-default">
-                <div className="relative w-20 h-20 rounded-full border-2 border-slate-100 overflow-hidden shadow-sm">
+              <div className="flex flex-col items-center gap-2 group cursor-pointer" 
+                   onClick={() => setViewer({ isOpen: true, list: userData.pets.map(p => ({ type: 'image', url: p.photoURL, name: p.name })), index: index, onClose: null })}>
+                <div className="relative w-20 h-20 rounded-full border-2 border-slate-100 overflow-hidden shadow-sm hover:opacity-90 transition-opacity">
                   <img src={pet.photoURL} className="w-full h-full object-cover" alt={pet.name} />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-white text-[10px] font-bold truncate px-1">{pet.name}</span>
-                  </div>
                 </div>
               </div>
             </SwiperSlide>
@@ -82,9 +73,13 @@ export default function ProfilePage() {
         </Swiper>
       </div>
 
-      {/* 프로필 정보 및 게시글 리스트는 동일 */}
       <div className="flex items-center justify-between mb-6">
-        <img src={userData.photoURL || auth.currentUser?.photoURL || "/default-profile.png"} className="w-20 h-20 rounded-full object-cover shadow-sm border border-slate-100" alt="프로필" />
+        <img 
+          src={userData.photoURL || auth.currentUser?.photoURL || "/default-profile.png"} 
+          className="w-20 h-20 rounded-full object-cover shadow-sm border border-slate-100 cursor-pointer" 
+          alt="프로필" 
+          onClick={() => setViewer({ isOpen: true, list: [{ type: 'image', url: userData.photoURL || auth.currentUser?.photoURL || "/default-profile.png" }], index: 0, onClose: null })}
+        />
         {auth.currentUser?.uid === uid && (
           <button onClick={() => setIsEditModalOpen(true)} className="px-4 py-2 bg-slate-100 text-xs font-bold rounded-xl cursor-pointer hover:bg-slate-200 transition-colors">프로필 편집</button>
         )}
@@ -103,13 +98,20 @@ export default function ProfilePage() {
       {activeTab === "feed" ? (
         <div className="space-y-6">
           {userPosts.map(post => (
-            <PostCard key={post.id} {...post} volume={volume} isPlaying={playingPostId === post.id} onVisibilityChange={(isVisible) => isVisible && setPlayingPostId(post.id)} onHoverStateChange={(isHovered) => setPlayingPostId(isHovered ? post.id : null)} onOpenViewer={(idx, onClose) => setViewer({ isOpen: true, list: post.mediaList || [], index: idx, postId: post.id, onClose })} onUpdateIndex={(idx) => setUserPosts(prev => prev.map(p => p.id === post.id ? {...p, lastIndex: idx} : p))} />
+            <PostCard 
+              key={post.id} {...post} volume={volume} isPlaying={playingPostId === post.id}
+              onVisibilityChange={(isVisible) => isVisible && setPlayingPostId(post.id)}
+              onHoverStateChange={(isHovered) => setPlayingPostId(isHovered ? post.id : null)}
+              onOpenViewer={(idx, onClose) => setViewer({ isOpen: true, list: (post.mediaList || []).map(m => ({...m, type: m.type || 'image'})), index: idx, postId: post.id, onClose })}
+              onUpdateIndex={(idx) => setUserPosts(prev => prev.map(p => p.id === post.id ? {...p, lastIndex: idx} : p))}
+            />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-1">
           {allMediaList.map((media, mIdx) => (
-            <div key={mIdx} className="aspect-square bg-slate-100 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setViewer({ isOpen: true, list: allMediaList, index: mIdx, postId: media.postId })}>
+            <div key={mIdx} className="aspect-square bg-slate-100 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" 
+                 onClick={() => setViewer({ isOpen: true, list: allMediaList, index: mIdx, postId: media.postId, onClose: null })}>
               {media.type === "video" ? <video src={media.url} className="w-full h-full object-cover" /> : <img src={media.url} className="w-full h-full object-cover" alt="media" />}
             </div>
           ))}
@@ -117,7 +119,6 @@ export default function ProfilePage() {
       )}
 
       {isEditModalOpen && <EditProfileModal userData={userData} uid={uid} onClose={() => setIsEditModalOpen(false)} onUpdate={async () => { await fetchData(); await fetchProfile(uid); }} />}
-      {viewer.isOpen && <MediaViewer {...viewer} volume={volume} onVolumeChange={setVolume} onClose={() => setViewer({ ...viewer, isOpen: false })} />}
     </div>
   );
 }
