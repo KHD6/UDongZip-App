@@ -1,13 +1,21 @@
-// src/pages/ProfilePage.jsx
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, deleteDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  addDoc,
+  deleteDoc,
+} from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
-import PostCard from "../components/PostCard";
 import EditProfileModal from "../components/EditProfileModal";
-import { Swiper, SwiperSlide } from "swiper/react";
-import "swiper/css";
+import ProfileHeader from "../components/profile/ProfileHeader";
+import ProfileBody from "../components/profile/ProfileBody";
 
 export default function ProfilePage({ setViewer, volume, setVolume }) {
   const { uid } = useParams();
@@ -17,146 +25,124 @@ export default function ProfilePage({ setViewer, volume, setVolume }) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("feed");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [playingPostId, setPlayingPostId] = useState(null);
-  
-  // 팔로우 관련 상태 추가
+
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
 
+  const [followerUsers, setFollowerUsers] = useState([]);
+  const [followingUsers, setFollowingUsers] = useState([]);
+  const [myFollowingIds, setMyFollowingIds] = useState(new Set());
+
   const fetchData = async () => {
     setLoading(true);
+    setActiveTab("feed");
     try {
       const userDoc = await getDoc(doc(db, "users", uid));
       const data = userDoc.exists() ? userDoc.data() : {};
       setUserData(data);
 
-      const postsQuery = query(collection(db, "posts"), where("uid", "==", uid), orderBy("createdAt", "desc"));
-      const snapshot = await getDocs(postsQuery);
-
-      const enrichedPosts = snapshot.docs.map((doc) => ({
+      const postsSnapshot = await getDocs(
+        query(collection(db, "posts"), where("uid", "==", uid), orderBy("createdAt", "desc"))
+      );
+      setUserPosts(postsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         nickname: data.displayName || "집사",
-        photoURL: data.photoURL || auth.currentUser?.photoURL || "/default-profile.png",
-        user_handle: data.user_handle || "",
-      }));
-      setUserPosts(enrichedPosts);
+        photoURL: data.photoURL || "/default-profile.png"
+      })));
 
-      // 팔로우 데이터 로직 복구
       const followerSnap = await getDocs(query(collection(db, "follows"), where("followingId", "==", uid)));
       setFollowerCount(followerSnap.size);
+      const fers = await Promise.all(followerSnap.docs.map(async fDoc => {
+        const uSnap = await getDoc(doc(db, "users", fDoc.data().followerId));
+        return uSnap.exists() ? { uid: uSnap.id, ...uSnap.data() } : null;
+      }));
+      setFollowerUsers(fers.filter(u => u !== null));
 
       const followingSnap = await getDocs(query(collection(db, "follows"), where("followerId", "==", uid)));
       setFollowingCount(followingSnap.size);
+      const fings = await Promise.all(followingSnap.docs.map(async fDoc => {
+        const uSnap = await getDoc(doc(db, "users", fDoc.data().followingId));
+        return uSnap.exists() ? { uid: uSnap.id, ...uSnap.data() } : null;
+      }));
+      setFollowingUsers(fings.filter(u => u !== null));
 
-      if (auth.currentUser && auth.currentUser.uid !== uid) {
-        const checkFollow = query(collection(db, "follows"), where("followerId", "==", auth.currentUser.uid), where("followingId", "==", uid));
-        const snap = await getDocs(checkFollow);
-        setIsFollowing(!snap.empty);
+      if (auth.currentUser) {
+        const myFollowSnap = await getDocs(query(collection(db, "follows"), where("followerId", "==", auth.currentUser.uid)));
+        const myFollows = new Set(myFollowSnap.docs.map(d => d.data().followingId));
+        setMyFollowingIds(myFollows);
+        setIsFollowing(myFollows.has(uid));
       }
-    } catch (err) { console.error("데이터 로딩 실패:", err); } finally { setLoading(false); }
+    } catch (err) {
+      console.error("데이터 로딩 실패:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchData(); }, [uid]);
 
-  const handleFollow = async () => {
-    if (!auth.currentUser) return;
+  const toggleFollow = async (targetUid) => {
+    if (!auth.currentUser || auth.currentUser.uid === targetUid) return;
     try {
-      if (isFollowing) {
-        const q = query(collection(db, "follows"), where("followerId", "==", auth.currentUser.uid), where("followingId", "==", uid));
+      const isCurrentlyFollowing = myFollowingIds.has(targetUid);
+      if (isCurrentlyFollowing) {
+        const q = query(collection(db, "follows"), where("followerId", "==", auth.currentUser.uid), where("followingId", "==", targetUid));
         const snap = await getDocs(q);
         snap.forEach(d => deleteDoc(doc(db, "follows", d.id)));
-        setIsFollowing(false);
-        setFollowerCount(prev => prev - 1);
+        setMyFollowingIds(prev => { const next = new Set(prev); next.delete(targetUid); return next; });
+        if (targetUid === uid) { setIsFollowing(false); setFollowerCount(prev => prev - 1); }
       } else {
-        await addDoc(collection(db, "follows"), { followerId: auth.currentUser.uid, followingId: uid, createdAt: new Date() });
-        setIsFollowing(true);
-        setFollowerCount(prev => prev + 1);
+        await addDoc(collection(db, "follows"), { followerId: auth.currentUser.uid, followingId: targetUid, createdAt: new Date() });
+        setMyFollowingIds(prev => new Set(prev).add(targetUid));
+        if (targetUid === uid) { setIsFollowing(true); setFollowerCount(prev => prev + 1); }
       }
-    } catch (err) { console.error("팔로우 실패:", err); }
+    } catch (err) { console.error("팔로우 토글 실패:", err); }
   };
 
-  const allMediaList = userPosts.flatMap((post) =>
-    (post.mediaList || []).map((media) => ({ ...media, type: media.type || "image", postId: post.id }))
-  );
+  const allMediaList = userPosts.flatMap(post => (post.mediaList || []).map(m => ({ ...m, type: m.type || "image", postId: post.id })));
 
   if (loading) return <div className="p-8 text-center text-slate-400">🐾 집사 정보를 불러오는 중...</div>;
   if (!userData && !loading) return <div className="p-8 text-center text-slate-400">존재하지 않는 집사입니다.</div>;
 
   return (
     <div className="w-full max-w-[600px] mx-auto py-6 px-4 md:px-6">
-      <div className="mb-6">
-        <Swiper slidesPerView="auto" spaceBetween={16} className="w-full">
-          {userData.pets?.map((pet, index) => (
-            <SwiperSlide key={index} className="!w-auto">
-              <div className="flex flex-col items-center gap-2 group cursor-pointer" 
-                   onClick={() => setViewer({ isOpen: true, list: userData.pets.map(p => ({ type: 'image', url: p.photoURL, name: p.name })), index: index })}>
-                <div className="relative w-20 h-20 rounded-full border-2 border-slate-100 overflow-hidden shadow-sm hover:opacity-90 transition-opacity">
-                  <img src={pet.photoURL} className="w-full h-full object-cover" alt={pet.name} />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-white text-[10px] font-bold truncate px-1">{pet.name}</span>
-                  </div>
-                </div>
-              </div>
-            </SwiperSlide>
-          ))}
-          {(!userData.pets || userData.pets.length === 0) && auth.currentUser?.uid === uid && (
-            <SwiperSlide className="!w-auto">
-              <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => setIsEditModalOpen(true)}>
-                <div className="w-20 h-20 rounded-full border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-300 text-xs hover:border-slate-400 hover:text-slate-400 transition-colors">+</div>
-              </div>
-            </SwiperSlide>
-          )}
-        </Swiper>
-      </div>
+      <ProfileHeader 
+        userData={userData}
+        userPostsCount={userPosts.length}
+        followerCount={followerCount}
+        followingCount={followingCount}
+        isMe={auth.currentUser?.uid === uid}
+        isFollowing={isFollowing}
+        toggleFollow={() => toggleFollow(uid)}
+        setIsEditModalOpen={setIsEditModalOpen}
+        setActiveTab={setActiveTab}
+        setViewer={setViewer}
+      />
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-6">
-          <img src={userData.photoURL || auth.currentUser?.photoURL || "/default-profile.png"} className="w-20 h-20 rounded-full object-cover shadow-sm border border-slate-100 cursor-pointer" alt="프로필" 
-            onClick={() => setViewer({ isOpen: true, list: [{ type: 'image', url: userData.photoURL || auth.currentUser?.photoURL || "/default-profile.png" }], index: 0 })}
-          />
-          <div className="flex gap-6 md:gap-10">
-            {[ { label: "게시글", value: userPosts.length }, { label: "팔로워", value: followerCount }, { label: "팔로잉", value: followingCount } ].map((stat, i) => (
-              <div key={i} className="flex flex-col items-center"><span className="font-bold text-slate-800">{stat.value}</span><span className="text-[11px] text-slate-500 font-medium">{stat.label}</span></div>
-            ))}
-          </div>
-        </div>
-        {/* 버튼 로직 복구 */}
-        {auth.currentUser?.uid === uid ? (
-          <button onClick={() => setIsEditModalOpen(true)} className="px-4 py-2 bg-slate-100 text-xs font-bold rounded-xl cursor-pointer hover:bg-slate-200 transition-colors">프로필 편집</button>
-        ) : (
-          <button onClick={handleFollow} className={`px-4 py-2 text-xs font-bold rounded-xl cursor-pointer transition-colors ${isFollowing ? "bg-slate-200 text-slate-800" : "bg-slate-900 text-white"}`}>{isFollowing ? "팔로잉" : "팔로우"}</button>
-        )}
-      </div>
+      <ProfileBody 
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        userPosts={userPosts}
+        allMediaList={allMediaList}
+        followerUsers={followerUsers}
+        followingUsers={followingUsers}
+        myFollowingIds={myFollowingIds}
+        toggleFollow={toggleFollow}
+        authUid={auth.currentUser?.uid}
+        setViewer={setViewer}
+        volume={volume}
+      />
 
-      <div className="mb-6">
-        <h1 className="font-bold text-lg text-slate-800">{userData.displayName || auth.currentUser?.displayName}</h1>
-        <p className="text-sm text-slate-600 mt-1">{userData.bio || "반가워요! 우동집 집사입니다. 🐾"}</p>
-      </div>
-
-      <div className="flex border-b border-slate-100 mb-6">
-        <button onClick={() => setActiveTab("feed")} className={`flex-1 py-3 text-sm font-bold cursor-pointer ${activeTab === "feed" ? "text-slate-900 border-b-2 border-slate-900" : "text-slate-400 hover:text-slate-600"}`}>게시글</button>
-        <button onClick={() => setActiveTab("media")} className={`flex-1 py-3 text-sm font-bold cursor-pointer ${activeTab === "media" ? "text-slate-900 border-b-2 border-slate-900" : "text-slate-400 hover:text-slate-600"}`}>미디어</button>
-      </div>
-
-      {activeTab === "feed" ? (
-        <div className="space-y-6">
-          {userPosts.map((post) => (
-            <PostCard key={post.id} {...post} volume={volume} isPlaying={playingPostId === post.id} onVisibilityChange={(isVisible) => isVisible && setPlayingPostId(post.id)} onHoverStateChange={(isHovered) => setPlayingPostId(isHovered ? post.id : null)} onOpenViewer={(idx, onClose) => setViewer({ isOpen: true, list: (post.mediaList || []).map(m => ({...m, type: m.type || 'image'})), index: idx, postId: post.id, onClose })} onUpdateIndex={(idx) => setUserPosts(prev => prev.map(p => p.id === post.id ? {...p, lastIndex: idx} : p))} />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-1">
-          {allMediaList.map((media, mIdx) => (
-            <div key={mIdx} className="aspect-square bg-slate-100 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setViewer({ isOpen: true, list: allMediaList, index: mIdx, postId: media.postId })}>
-              {media.type === "video" ? <video src={media.url} className="w-full h-full object-cover" /> : <img src={media.url} className="w-full h-full object-cover" alt="media" />}
-            </div>
-          ))}
-        </div>
+      {isEditModalOpen && (
+        <EditProfileModal
+          userData={userData}
+          uid={uid}
+          onClose={() => setIsEditModalOpen(false)}
+          onUpdate={async () => { await fetchData(); await fetchProfile(uid); }}
+        />
       )}
-
-      {isEditModalOpen && <EditProfileModal userData={userData} uid={uid} onClose={() => setIsEditModalOpen(false)} onUpdate={async () => { await fetchData(); await fetchProfile(uid); }} />}
     </div>
   );
 }
