@@ -15,7 +15,7 @@ export default function ProfileHeader({
   setActiveTab, 
   setViewer 
 }) {
-  // 나이 계산 로직
+  // 나이 계산 로직 (중간 점 제외하고 나이 텍스트만 반환하도록 수정)
   const calculateAge = (birthday) => {
     if (!birthday) return "";
     const birthDate = new Date(birthday);
@@ -24,12 +24,12 @@ export default function ProfileHeader({
     const monthDiff = today.getMonth() - birthDate.getMonth();
     
     if (age === 0) {
-      return ` · ${monthDiff > 0 ? monthDiff : 0}개월`;
+      return `${monthDiff > 0 ? monthDiff : 0}개월`;
     }
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    return age === 0 ? ` · ${monthDiff}개월` : ` · ${age}살`;
+    return age === 0 ? `${monthDiff}개월` : `${age}살`;
   };
 
   // 슬라이드 텍스트 노출 여부 계산 (등록된 펫 + 추가 버튼 합계가 3개 초과 시 노출)
@@ -54,31 +54,41 @@ export default function ProfileHeader({
           spaceBetween={12} 
           className="w-full"
         >
-          {userData.pets?.map((pet, index) => (
-            <SwiperSlide key={index} className="!w-[140px]">
-              <div 
-                className="relative aspect-[3/4] rounded-[24px] overflow-hidden shadow-sm group cursor-pointer border border-white"
-                onClick={() => setViewer({
-                  isOpen: true,
-                  list: userData.pets.map(p => ({ type: "image", url: p.photoURL, name: p.name })),
-                  index: index
-                })}
-              >
-                <img 
-                  src={pet.photoURL} 
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                  alt={pet.name} 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
-                <div className="absolute bottom-3 left-3 right-3 text-white">
-                  <p className="font-black text-sm truncate">{pet.name}</p>
-                  <p className="text-[10px] font-bold opacity-90 truncate">
-                    {pet.species || ""}{calculateAge(pet.birthday)}
-                  </p>
+          {userData.pets?.map((pet, index) => {
+            const ageText = calculateAge(pet.birthday);
+            return (
+              <SwiperSlide key={index} className="!w-[140px]">
+                <div 
+                  className="relative aspect-[3/4] rounded-[24px] overflow-hidden shadow-sm group cursor-pointer border border-white"
+                  onClick={() => setViewer({
+                    isOpen: true,
+                    list: userData.pets.map(p => ({ type: "image", url: p.photoURL, name: p.name })),
+                    index: index
+                  })}
+                >
+                  <img 
+                    src={pet.photoURL} 
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                    alt={pet.name} 
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
+                  <div className="absolute bottom-3 left-3 right-3 text-white">
+                    <p className="font-black text-sm truncate">{pet.name}</p>
+                    <p className="text-[10px] font-bold opacity-90 truncate">
+                      {/* 종족 정보 */}
+                      {pet.species || ""}
+                      {/* 종족과 나이가 모두 있을 때만 가운데 점 표시 */}
+                      {pet.species && ageText ? " · " : ""}
+                      {/* 나이 정보 */}
+                      {ageText}
+                      {/* 정보가 아예 없을 때의 폴백 */}
+                      {!pet.species && !ageText && ""}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </SwiperSlide>
-          ))}
+              </SwiperSlide>
+            );
+          })}
 
           {/* 본인일 때만 '아이 등록' 카드 노출 */}
           {isMe && (
@@ -159,7 +169,7 @@ export default function ProfileHeader({
           </p>
         </div>
 
-        {/* 3. 액션 버튼 영역 (톱니바퀴 제거 및 레이아웃 최적화) */}
+        {/* 3. 액션 버튼 영역 */}
         <div className="flex gap-2">
           {isMe ? (
             <button 
@@ -172,7 +182,7 @@ export default function ProfileHeader({
             <button 
               onClick={toggleFollow} 
               className={`flex-1 py-3 text-sm font-black rounded-2xl cursor-pointer transition-all shadow-sm ${
-                isFollowing ? "bg-slate-100 text-slate-500 hover:bg-slate-200" : "bg-[#c29b7c] text-white hover:bg-[#b08968]"
+                isFollowing ? "bg-slate-100 text-slate-500" : "bg-[#c29b7c] text-white hover:bg-[#b08968]"
               }`}
             >
               {isFollowing ? "언팔로우" : "팔로우"}
