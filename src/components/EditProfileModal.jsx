@@ -1,30 +1,54 @@
 // src/components/EditProfileModal.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { updateDoc, doc } from "firebase/firestore";
-import { db, storage } from "../firebase"; // storage import
+import { auth, db, storage } from "../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { Camera, X } from "lucide-react";
 
 export default function EditProfileModal({ userData, uid, onClose, onUpdate }) {
   const [displayName, setDisplayName] = useState(userData.displayName || "");
   const [bio, setBio] = useState(userData.bio || "");
+  
+  // ❗ 우선순위 로직 적용: userData(DB) -> auth(구글) -> 기본 이미지
+  const initialPhotoURL = userData.photoURL || auth.currentUser?.photoURL || "/default-profile.png";
+  const [photoURL, setPhotoURL] = useState(initialPhotoURL);
+  
   const [pets, setPets] = useState(userData.pets || []);
   const [isUploading, setIsUploading] = useState(false);
+  const [focused, setFocused] = useState(null);
+  
+  const modalRef = useRef(null);
 
-  const handleImageUpload = async (e, index) => {
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = "hidden";
+    const handleClickOutside = (e) => {
+      if (modalRef.current && !modalRef.current.contains(e.target)) onClose();
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.body.style.overflow = originalStyle;
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [onClose]);
+
+  const handleFileUpload = async (e, type, index = null) => {
     const file = e.target.files[0];
     if (!file) return;
-    
     setIsUploading(true);
     try {
-      const fileName = `pets/${uid}/${Date.now()}_${file.name}`;
-      const storageRef = ref(storage, fileName);
+      const path = type === 'profile' ? `users/${uid}/profile` : `pets/${uid}/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, path);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
       
-      const newPets = [...pets];
-      newPets[index].photoURL = url;
-      setPets(newPets);
-    } catch (err) { console.error("이미지 업로드 실패:", err); } 
+      if (type === 'profile') setPhotoURL(url);
+      else {
+        const newPets = [...pets];
+        newPets[index].photoURL = url;
+        setPets(newPets);
+      }
+    } catch (err) { console.error("업로드 실패:", err); }
     finally { setIsUploading(false); }
   };
 
@@ -32,48 +56,62 @@ export default function EditProfileModal({ userData, uid, onClose, onUpdate }) {
     if (isUploading) return;
     setIsUploading(true);
     try {
-      await updateDoc(doc(db, "users", uid), { displayName, bio, pets });
+      await updateDoc(doc(db, "users", uid), { displayName, bio, photoURL, pets });
       if (onUpdate) await onUpdate();
-      onClose(); 
-    } catch (err) { console.error("업데이트 실패:", err); alert("저장에 실패했습니다."); } finally { setIsUploading(false); }
+      onClose();
+    } catch (err) { console.error("업데이트 실패:", err); } finally { setIsUploading(false); }
   };
 
-  const addPet = () => setPets([...pets, { name: `새로운 펫 ${pets.length + 1}`, photoURL: "/default-profile.png" }]);
-
   return (
-    <div className="fixed inset-0 bg-black/50 z-[1000] flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-xl">
-        <h2 className="text-xl font-bold mb-4">프로필 편집</h2>
-        <div className="space-y-4">
-          <input className="w-full p-3 bg-slate-50 rounded-xl outline-none" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="닉네임" />
-          <textarea className="w-full p-3 bg-slate-50 rounded-xl outline-none" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="자기소개" />
-          
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
+      <div ref={modalRef} className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between p-4 border-b">
+          <button onClick={onClose} className="cursor-pointer hover:bg-slate-100 p-1 rounded-full"><X size={20} /></button>
+          <span className="font-bold text-sm">프로필 수정</span>
+          <button onClick={handleSave} disabled={isUploading} className="bg-black text-white px-4 py-1.5 rounded-full text-sm font-bold cursor-pointer hover:bg-slate-800 transition-colors">저장</button>
+        </div>
+
+        <div className="overflow-y-auto p-4 space-y-6">
+          <div className="relative mt-8">
+            <label className="absolute -top-12 left-4 w-24 h-24 rounded-full overflow-hidden cursor-pointer group border-4 border-white shadow-md">
+              <img src={photoURL} className="w-full h-full object-cover" alt="내 프로필" />
+              <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera className="text-white" size={24} />
+              </div>
+              <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'profile')} />
+            </label>
+            
+            <div className="space-y-4">
+              <div className={`border rounded-lg pl-2 ml-32 ${focused === 'name' ? "border-blue-500" : "border-slate-200"}`}>
+                <div className="flex justify-between px-1"><label className="text-xs text-slate-500 font-bold">닉네임</label>{focused === 'name' && <span className="text-[10px] text-slate-400">{displayName.length}/50</span>}</div>
+                <input className="w-full px-1 outline-none text-sm" value={displayName} onChange={(e) => setDisplayName(e.target.value)} onFocus={() => setFocused('name')} onBlur={() => setFocused(null)} />
+              </div>
+              
+              <div className={`border rounded-lg p-2 ${focused === 'bio' ? "border-blue-500" : "border-slate-200"}`}>
+                <div className="flex justify-between px-1"><label className="text-xs text-slate-500 font-bold">자기소개</label>{focused === 'bio' && <span className="text-[10px] text-slate-400">{bio.length}/160</span>}</div>
+                <textarea className="w-full px-1 outline-none text-sm h-16 resize-none" value={bio} onChange={(e) => setBio(e.target.value)} onFocus={() => setFocused('bio')} onBlur={() => setFocused(null)} />
+              </div>
+            </div>
+          </div>
+
           <div className="border-t pt-4">
-            <h3 className="font-bold mb-2 text-sm flex items-center gap-2">
-              반려동물 관리 <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[10px] text-slate-500">{pets.length}</span>
-            </h3>
-            <div className="h-[250px] overflow-y-auto pr-2 space-y-3 mb-2">
+            <h3 className="font-bold mb-3 text-sm flex items-center gap-2">반려동물 관리 <span className="text-slate-400">({pets.length})</span></h3>
+            <div className="h-[250px] overflow-y-auto pr-2 space-y-3 mb-3">
               {pets.map((pet, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <label className="w-12 h-12 rounded-full overflow-hidden cursor-pointer flex-shrink-0 border">
+                  <label className="w-10 h-10 rounded-full overflow-hidden cursor-pointer flex-shrink-0 border">
                     <img src={pet.photoURL} className="w-full h-full object-cover" alt="pet" />
-                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, i)} />
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'pet', i)} />
                   </label>
-                  <input className="flex-1 p-2 bg-slate-50 rounded-lg text-sm" value={pet.name} onChange={(e) => {
+                  <input className="flex-1 p-2 bg-slate-50 rounded-lg text-sm outline-none" value={pet.name} onChange={(e) => {
                     const newPets = [...pets]; newPets[i].name = e.target.value; setPets(newPets);
                   }} />
-                  <button onClick={() => setPets(pets.filter((_, idx) => idx !== i))} className="text-red-500 text-xs cursor-pointer">삭제</button>
+                  <button onClick={() => setPets(pets.filter((_, idx) => idx !== i))} className="text-red-500 text-xs cursor-pointer hover:underline">삭제</button>
                 </div>
               ))}
+              <button onClick={() => setPets([...pets, { name: `새로운 펫 ${pets.length + 1}`, photoURL: "/default-profile.png" }])} className="w-full py-2 bg-slate-100 rounded-lg text-sm font-bold cursor-pointer hover:bg-slate-200 transition-colors">+ 펫 추가</button>
             </div>
-            <button onClick={addPet} className="w-full py-2 bg-slate-100 rounded-lg text-sm font-bold cursor-pointer hover:bg-slate-200 transition-colors">+ 펫 추가</button>
           </div>
-        </div>
-        <div className="flex gap-2 mt-6">
-          <button onClick={onClose} className="flex-1 py-2 rounded-xl border cursor-pointer hover:bg-slate-50">취소</button>
-          <button onClick={handleSave} disabled={isUploading} className="flex-1 py-2 rounded-xl bg-slate-900 text-white font-bold cursor-pointer hover:bg-slate-800">
-            {isUploading ? "저장 중..." : "저장"}
-          </button>
         </div>
       </div>
     </div>
