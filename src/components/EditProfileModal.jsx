@@ -1,13 +1,32 @@
 // src/components/EditProfileModal.jsx
 import React, { useState } from "react";
 import { updateDoc, doc } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, storage } from "../firebase"; // storage import
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function EditProfileModal({ userData, uid, onClose, onUpdate }) {
   const [displayName, setDisplayName] = useState(userData.displayName || "");
   const [bio, setBio] = useState(userData.bio || "");
   const [pets, setPets] = useState(userData.pets || []);
   const [isUploading, setIsUploading] = useState(false);
+
+  const handleImageUpload = async (e, index) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setIsUploading(true);
+    try {
+      const fileName = `pets/${uid}/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, fileName);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      
+      const newPets = [...pets];
+      newPets[index].photoURL = url;
+      setPets(newPets);
+    } catch (err) { console.error("이미지 업로드 실패:", err); } 
+    finally { setIsUploading(false); }
+  };
 
   const handleSave = async () => {
     if (isUploading) return;
@@ -33,10 +52,13 @@ export default function EditProfileModal({ userData, uid, onClose, onUpdate }) {
             <h3 className="font-bold mb-2 text-sm flex items-center gap-2">
               반려동물 관리 <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[10px] text-slate-500">{pets.length}</span>
             </h3>
-            {/* 고정 높이 250px 적용 */}
-            <div className="h-[190px] overflow-y-auto pr-2 space-y-2 mb-2 scrollbar-none">
+            <div className="h-[250px] overflow-y-auto pr-2 space-y-3 mb-2">
               {pets.map((pet, i) => (
-                <div key={i} className="flex items-center gap-2">
+                <div key={i} className="flex items-center gap-3">
+                  <label className="w-12 h-12 rounded-full overflow-hidden cursor-pointer flex-shrink-0 border">
+                    <img src={pet.photoURL} className="w-full h-full object-cover" alt="pet" />
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, i)} />
+                  </label>
                   <input className="flex-1 p-2 bg-slate-50 rounded-lg text-sm" value={pet.name} onChange={(e) => {
                     const newPets = [...pets]; newPets[i].name = e.target.value; setPets(newPets);
                   }} />
