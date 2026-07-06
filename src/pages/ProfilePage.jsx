@@ -5,6 +5,7 @@ import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebas
 import { auth, db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import PostCard from "../components/PostCard";
+import MediaViewer from "../components/MediaViewer";
 import EditProfileModal from "../components/EditProfileModal";
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
@@ -42,14 +43,17 @@ export default function ProfilePage({ setViewer, volume, setVolume }) {
 
   useEffect(() => { fetchData(); }, [uid]);
 
+  // 미디어 탭을 위한 전체 미디어 리스트 구성
   const allMediaList = userPosts.flatMap(post => 
     (post.mediaList || []).map(media => ({ ...media, type: media.type || 'image', postId: post.id }))
   );
 
   if (loading) return <div className="p-8 text-center text-slate-400">🐾 집사 정보를 불러오는 중...</div>;
+  if (!userData && !loading) return <div className="p-8 text-center text-slate-400">존재하지 않는 집사입니다.</div>;
 
   return (
     <div className="w-full max-w-[600px] mx-auto py-6 px-4 md:px-6">
+      {/* 1. 상단 펫 갤러리 */}
       <div className="mb-6">
         <Swiper slidesPerView="auto" spaceBetween={16} className="w-full">
           {userData.pets?.map((pet, index) => (
@@ -58,6 +62,9 @@ export default function ProfilePage({ setViewer, volume, setVolume }) {
                    onClick={() => setViewer({ isOpen: true, list: userData.pets.map(p => ({ type: 'image', url: p.photoURL, name: p.name })), index: index, onClose: null })}>
                 <div className="relative w-20 h-20 rounded-full border-2 border-slate-100 overflow-hidden shadow-sm hover:opacity-90 transition-opacity">
                   <img src={pet.photoURL} className="w-full h-full object-cover" alt={pet.name} />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-white text-[10px] font-bold truncate px-1">{pet.name}</span>
+                  </div>
                 </div>
               </div>
             </SwiperSlide>
@@ -73,6 +80,7 @@ export default function ProfilePage({ setViewer, volume, setVolume }) {
         </Swiper>
       </div>
 
+      {/* 2. 프로필 헤더 */}
       <div className="flex items-center justify-between mb-6">
         <img 
           src={userData.photoURL || auth.currentUser?.photoURL || "/default-profile.png"} 
@@ -90,16 +98,20 @@ export default function ProfilePage({ setViewer, volume, setVolume }) {
         <p className="text-sm text-slate-600 mt-1">{userData.bio || "반가워요! 우동집 집사입니다. 🐾"}</p>
       </div>
 
+      {/* 3. 탭 */}
       <div className="flex border-b border-slate-100 mb-6">
         <button onClick={() => setActiveTab("feed")} className={`flex-1 py-3 text-sm font-bold cursor-pointer ${activeTab === "feed" ? "text-slate-900 border-b-2 border-slate-900" : "text-slate-400 hover:text-slate-600"}`}>게시글</button>
         <button onClick={() => setActiveTab("media")} className={`flex-1 py-3 text-sm font-bold cursor-pointer ${activeTab === "media" ? "text-slate-900 border-b-2 border-slate-900" : "text-slate-400 hover:text-slate-600"}`}>미디어</button>
       </div>
 
+      {/* 4. 컨텐츠 */}
       {activeTab === "feed" ? (
         <div className="space-y-6">
           {userPosts.map(post => (
             <PostCard 
-              key={post.id} {...post} volume={volume} isPlaying={playingPostId === post.id}
+              key={post.id} {...post}
+              volume={volume}
+              isPlaying={playingPostId === post.id}
               onVisibilityChange={(isVisible) => isVisible && setPlayingPostId(post.id)}
               onHoverStateChange={(isHovered) => setPlayingPostId(isHovered ? post.id : null)}
               onOpenViewer={(idx, onClose) => setViewer({ isOpen: true, list: (post.mediaList || []).map(m => ({...m, type: m.type || 'image'})), index: idx, postId: post.id, onClose })}
