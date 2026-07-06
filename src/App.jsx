@@ -75,7 +75,7 @@ function AppContent() {
   if (!user) return <div className="flex flex-col items-center justify-center min-h-screen"><LoginButtons /></div>;
 
   return (
-    <div className="min-h-screen bg-[#fdfbf7] w-full relative">
+    <div className="min-h-screen bg-[#f9f4ec] w-full relative">
       <Navigation isNavVisible={isNavVisible} onNewPostClick={handleOpenWriteModal} />
       <div className="pt-[52px] md:pt-0 md:ml-[100px] xl:ml-[220px] min-h-screen flex justify-center px-4">
         <div className="flex w-full max-w-[950px] justify-center lg:justify-start">

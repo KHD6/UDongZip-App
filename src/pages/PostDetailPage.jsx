@@ -1,4 +1,3 @@
-// src/pages/PostDetailPage.jsx
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
