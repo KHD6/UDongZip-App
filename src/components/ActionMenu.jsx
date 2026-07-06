@@ -16,7 +16,7 @@ export default function ActionMenu({ onEdit, onDelete, onReport }) {
     <div className="relative" ref={menuRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)} 
-        className="text-slate-400 hover:text-slate-600 font-bold text-xl"
+        className="text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer"
       >
         ⋮
       </button>
