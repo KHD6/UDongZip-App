@@ -15,22 +15,50 @@ import {
   startAfter 
 } from "firebase/firestore";
 
-export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, volume, setVolume }) {
-  const PAGE_SIZE = 5; // 한 페이지당 로드할 게시글 개수 (최적의 파이어베이스 읽기 제어)
+export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, volume, setVolume, isNavVisible }) {
+  const PAGE_SIZE = 5; // 한 페이지당 로드할 게시글 개수
   
   const [posts, setPosts] = useState([]);
   const [playingPostId, setPlayingPostId] = useState(null);
   const [activeTab, setActiveTab] = useState("recommend"); // "recommend" | "following"
   
-  // 무한 스크롤을 위한 상태 제어
+  // 무한 스크롤 상태
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [lastVisible, setLastVisible] = useState(null); // 마지막 도큐먼트 커서 기록
-  const [hasMore, setHasMore] = useState(true); // 더 가져올 데이터가 있는지 여부
+  const [lastVisible, setLastVisible] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+
+  // 데스크톱 전용 탭바 스크롤 반응형 상태
+  const [isTabVisible, setIsTabVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
 
   const observerRef = useRef();
 
-  // 1. 유저 정보 결합(Enrich) 유틸 함수
+  // 데스크톱 전용 탭바 스크롤 감지 리스너 (768px 이상 분기 적용)
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      if (window.innerWidth >= 768) {
+        if (currentScrollY <= 50) {
+          setIsTabVisible(true);
+        } else if (currentScrollY > lastScrollY) {
+          setIsTabVisible(false); // 스크롤 내릴 때: 탭바 슬라이드 업 (숨김)
+        } else {
+          setIsTabVisible(true);  // 스크롤 올릴 때: 탭바 슬라이드 다운 (노출)
+        }
+      } else {
+        // 모바일 환경은 전역 제어로 동작하므로 트래킹 상태 고정
+        setIsTabVisible(true);
+      }
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [lastScrollY]);
+
+  // 유저 정보 결합(Enrich) 유틸 함수
   const enrichPosts = async (rawPosts) => {
     const userCache = {};
     return await Promise.all(
@@ -54,7 +82,7 @@ export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, v
     );
   };
 
-  // 2. 피드 호출 엔진 (최초 로드 및 무한 스크롤 통합)
+  // 피드 호출 엔진
   const fetchPosts = async (isInitial = true) => {
     if (isInitial) {
       setLoading(true);
@@ -68,24 +96,12 @@ export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, v
 
       if (activeTab === "recommend") {
         if (isInitial) {
-          // 추천 탭 최초 로드
-          q = query(
-            collection(db, "posts"), 
-            orderBy("createdAt", "desc"), 
-            limit(PAGE_SIZE)
-          );
+          q = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
         } else {
-          // 추천 탭 무한 스크롤 추가 로드
           if (!lastVisible) return;
-          q = query(
-            collection(db, "posts"), 
-            orderBy("createdAt", "desc"), 
-            startAfter(lastVisible), 
-            limit(PAGE_SIZE)
-          );
+          q = query(collection(db, "posts"), orderBy("createdAt", "desc"), startAfter(lastVisible), limit(PAGE_SIZE));
         }
       } else {
-        // 팔로잉 탭 처리
         if (!myUid) {
           setPosts([]);
           setHasMore(false);
@@ -106,7 +122,6 @@ export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, v
         }
 
         if (isInitial) {
-          // 팔로잉 탭 최초 로드
           q = query(
             collection(db, "posts"), 
             where("uid", "in", followingIds.slice(0, 30)), 
@@ -114,7 +129,6 @@ export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, v
             limit(PAGE_SIZE)
           );
         } else {
-          // 팔로잉 탭 무한 스크롤 추가 로드
           if (!lastVisible) return;
           q = query(
             collection(db, "posts"), 
@@ -132,7 +146,6 @@ export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, v
         setHasMore(false);
         if (isInitial) setPosts([]);
       } else {
-        // 마지막 도큐먼트 추적 커서 갱신
         const lastDoc = snapshot.docs[snapshot.docs.length - 1];
         setLastVisible(lastDoc);
         setHasMore(snapshot.docs.length === PAGE_SIZE);
@@ -143,7 +156,7 @@ export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, v
         if (isInitial) {
           setPosts(enriched);
         } else {
-          setPosts(prev => [...prev, ...enriched]); // 기존 데이터 뒤에 추가 병합
+          setPosts(prev => [...prev, ...enriched]);
         }
       }
     } catch (error) {
@@ -154,13 +167,12 @@ export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, v
     }
   };
 
-  // 3. 무한 스크롤 감지 센서 (Intersection Observer)
+  // 무한 스크롤 감지 센서
   const lastPostElementRef = useCallback((node) => {
     if (loading || loadingMore) return;
     if (observerRef.current) observerRef.current.disconnect();
 
     observerRef.current = new IntersectionObserver((entries) => {
-      // 감지 노드가 화면에 나타났고 더 가져올 데이터가 존재한다면 추가 로드 트리거
       if (entries[0].isIntersecting && hasMore) {
         fetchPosts(false);
       }
@@ -169,7 +181,6 @@ export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, v
     if (node) observerRef.current.observe(node);
   }, [loading, loadingMore, hasMore, lastVisible]);
 
-  // 탭 상태 및 신규 기록 상태 변화에 따른 피드 상태 초기화 및 재조회
   useEffect(() => {
     setLastVisible(null);
     setHasMore(true);
@@ -179,8 +190,18 @@ export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, v
 
   return (
     <div className="w-full">
-      {/* 상단 탭 내비게이션 (트위터 스타일) */}
-      <div className="sticky top-0 z-30 flex bg-white/80 backdrop-blur-md border-b border-slate-100">
+      {/* 
+        ❗ 모바일/PC 레이아웃 왜곡 완벽 정돈 최종본
+        - 모바일: isNavVisible에 따라 'top-[52px]'과 'top-0'을 정밀 타겟팅하여 가림 현상 완벽 방어
+        - 데스크톱(md): 'md:top-0' 및 'md:translate-y' 슬라이드 트랜지션만 독립적으로 타겟팅하여 충돌 방지
+      */}
+      <div 
+        className={`sticky z-30 flex bg-white/80 backdrop-blur-md border-b border-slate-100 transition-all duration-300 ${
+          isNavVisible ? "top-[52px] md:top-0" : "top-0 md:top-0"
+        } ${
+          isTabVisible ? "md:translate-y-0" : "md:-translate-y-full"
+        }`}
+      >
         <button
           onClick={() => setActiveTab("recommend")}
           className={`flex-1 py-4 text-sm font-bold transition-colors cursor-pointer relative ${
@@ -210,7 +231,6 @@ export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, v
           <div className="py-20 text-center text-slate-400 animate-pulse">피드를 불러오는 중...</div>
         ) : posts.length > 0 ? (
           posts.map((post, index) => {
-            // 마지막 요소에 Observer 타겟 Ref를 심어 감지하도록 처리
             const isLastElement = posts.length === index + 1;
             return (
               <div ref={isLastElement ? lastPostElementRef : null} key={post.id}>
@@ -253,7 +273,6 @@ export default function MainContent({ refreshKey, onOpenWriteModal, setViewer, v
           </div>
         )}
 
-        {/* 무한 스크롤 추가 로드 인디케이터 */}
         {loadingMore && (
           <div className="py-6 text-center text-slate-400 font-bold text-xs animate-pulse">
             🐾 다음 소식 읽어오는 중...

@@ -15,14 +15,18 @@ export default function Navigation({ isNavVisible, onNewPostClick }) {
   const [isCopied, setIsCopied] = useState(false);
   const logoutRef = useRef(null);
 
+  // 페이지 이동 시 열려있던 모달이나 하단바 닫기
   useEffect(() => {
     setIsMoreOpen(false);
     setIsLogoutOpen(false);
   }, [location.pathname]);
 
+  // 데스크톱 로그아웃 바깥 영역 클릭 감지
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (logoutRef.current && !logoutRef.current.contains(e.target)) setIsLogoutOpen(false);
+      if (logoutRef.current && !logoutRef.current.contains(e.target)) {
+        setIsLogoutOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -36,15 +40,21 @@ export default function Navigation({ isNavVisible, onNewPostClick }) {
       await navigator.clipboard.writeText(`@${handle}`);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error("복사 실패:", err);
+    }
   };
 
-  const handleLogout = () => { if (window.confirm("로그아웃 하시겠습니까?")) auth.signOut(); };
+  const handleLogout = () => {
+    if (window.confirm("로그아웃 하시겠습니까?")) auth.signOut();
+  };
 
   return (
     <>
-      {/* 모바일 상단 바 */}
-      <header className={`fixed top-0 left-0 w-full h-[52px] bg-white/95 backdrop-blur-md border-b border-slate-100 z-50 flex items-center justify-between px-4 transition-transform duration-300 md:hidden ${isNavVisible ? "translate-y-0" : "-translate-y-full"}`}>
+      {/* =========================================================================
+          [모바일 전용] 상단 헤더 바
+         ========================================================================= */}
+      <header className={`fixed top-0 left-0 w-full h-[52px] bg-white border-b border-slate-100 z-50 flex items-center justify-between px-4 transition-transform duration-300 md:hidden ${isNavVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <Link to={`/profile/${auth.currentUser?.uid}`} className="flex items-center cursor-pointer">
           <img src={profile?.photoURL || auth.currentUser?.photoURL || "/default-avatar.png"} className="w-8 h-8 rounded-full bg-slate-200 object-cover" alt="내 프로필" />
         </Link>
@@ -52,7 +62,9 @@ export default function Navigation({ isNavVisible, onNewPostClick }) {
         <button className="text-xl p-1 hover:bg-slate-50 rounded-full transition-colors cursor-pointer">🔔</button>
       </header>
 
-      {/* 데스크탑 좌측 사이드바 */}
+      {/* =========================================================================
+          [데스크탑 전용] 좌측 사이드바
+         ========================================================================= */}
       <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-[100px] xl:w-[220px] bg-[#f3f0e8]/80 backdrop-blur-md border-r border-slate-200/60 p-4 justify-between transition-all duration-300 z-50">
         <div className="flex flex-col gap-3 items-center xl:items-start">
           <div className="py-4 px-2 hidden xl:block">
@@ -75,7 +87,7 @@ export default function Navigation({ isNavVisible, onNewPostClick }) {
           </button>
         </div>
 
-        {/* 내 프로필 카드 */}
+        {/* 내 프로필 카드 (PC용) */}
         <div className="w-full mb-2 relative" ref={logoutRef}>
           <div className="flex items-center p-2 hover:bg-slate-200/50 rounded-2xl transition-all duration-200 w-full justify-center xl:justify-start gap-3">
             <Link to={`/profile/${auth.currentUser?.uid}`} className="shrink-0 cursor-pointer">
@@ -100,15 +112,60 @@ export default function Navigation({ isNavVisible, onNewPostClick }) {
         </div>
       </nav>
 
-      {/* 모바일 하단 바 */}
+      {/* =========================================================================
+          [모바일 전용] 더보기 팝오버 레이어 (설정 이동 복구 및 v0 테마 적용)
+         ========================================================================= */}
+      {isMoreOpen && (
+        <>
+          {/* 바깥 딤드 처리 레이어 */}
+          <div 
+            className="fixed inset-0 bg-black/20 z-[55] md:hidden backdrop-blur-sm"
+            onClick={() => setIsMoreOpen(false)}
+          />
+          {/* 더보기 팝오버 박스 */}
+          <div className="fixed bottom-20 left-4 right-4 bg-[#fdfbf7]/95 backdrop-blur-md rounded-[24px] shadow-[0_16px_48px_rgba(194,155,124,0.18)] border border-orange-100/50 p-2.5 z-[60] md:hidden flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-4 duration-200">
+            <Link
+              to={MENU_DETAILS.settings.path}
+              className={`flex items-center gap-3 p-3.5 rounded-[16px] transition-colors cursor-pointer ${
+                location.pathname === MENU_DETAILS.settings.path 
+                  ? "bg-[#c29b7c] text-white font-black" 
+                  : "text-slate-600 hover:bg-white font-bold"
+              }`}
+            >
+              <MENU_DETAILS.settings.icon size={18} className={location.pathname === MENU_DETAILS.settings.path ? "text-white" : "text-slate-400"} />
+              <span className="text-sm">{MENU_DETAILS.settings.label}</span>
+            </Link>
+          </div>
+        </>
+      )}
+
+      {/* =========================================================================
+          [모바일 전용] 하단 내비게이션 바
+         ========================================================================= */}
       <div className={`fixed bottom-0 left-0 w-full h-16 bg-white/95 backdrop-blur-md border-t border-slate-100 z-50 flex items-center justify-around px-2 transition-transform duration-300 md:hidden ${isNavVisible ? "translate-y-0" : "translate-y-full"}`}>
         {MOBILE_NAV_ITEMS.map((item) => {
           const isMoreButton = item.label === "더보기";
           const targetPath = item.path === "/profile" ? `/profile/${auth.currentUser?.uid}` : item.path;
           const isActive = isMoreButton ? isMoreOpen : location.pathname === targetPath;
           return (
-            <button key={item.label} onClick={() => isMoreButton ? setIsMoreOpen(!isMoreOpen) : null} className={`flex flex-col items-center justify-center p-2 rounded-xl flex-1 cursor-pointer ${isActive ? "text-slate-900 font-bold" : "text-slate-400"}`}>
-              {!isMoreButton ? <Link to={targetPath} className="flex flex-col items-center"><item.icon size={20} /><span className="text-[10px] mt-1">{item.label}</span></Link> : <><item.icon size={20} /><span className="text-[10px] mt-1">{item.label}</span></>}
+            <button 
+              key={item.label} 
+              onClick={() => isMoreButton ? setIsMoreOpen(!isMoreOpen) : null} 
+              className={`flex flex-col items-center justify-center p-2 rounded-xl flex-1 cursor-pointer transition-colors ${
+                isActive ? "text-slate-900 font-bold" : "text-slate-400"
+              }`}
+            >
+              {!isMoreButton ? (
+                <Link to={targetPath} className="flex flex-col items-center cursor-pointer">
+                  <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                  <span className="text-[10px] mt-1 font-bold">{item.label}</span>
+                </Link>
+              ) : (
+                <div className="flex flex-col items-center cursor-pointer">
+                  <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                  <span className="text-[10px] mt-1 font-bold">{item.label}</span>
+                </div>
+              )}
             </button>
           );
         })}
