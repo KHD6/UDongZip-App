@@ -5,15 +5,15 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { db, auth } from "./firebase";
 import { getDoc, doc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 
-import Navigation from "./components/Navigation";
-import MainContent from "./components/MainContent";
-import RightSidebar from "./components/RightSidebar";
+import Navigation from "./components/layout/Navigation";
+import MainContent from "./components/post/MainContent";
+import RightSidebar from "./components/layout/RightSidebar";
 import PostDetailPage from "./pages/PostDetailPage";
-import LoginButtons from "./components/LoginButtons";
-import NicknameSetupModal from "./components/NicknameSetupModal";
-import PostForm from "./components/PostForm";
+import LoginButtons from "./components/auth/LoginButtons";
+import NicknameSetupModal from "./components/auth/NicknameSetupModal";
+import PostForm from "./components/post/PostForm";
 import ProfilePage from "./pages/ProfilePage";
-import MediaViewer from "./components/MediaViewer";
+import MediaViewer from "./components/common/MediaViewer";
 
 const AIRecommendPage = () => <div className="p-4">🤖 AI 페이지</div>;
 const MapPage = () => <div className="p-4">📍 지도 페이지</div>;

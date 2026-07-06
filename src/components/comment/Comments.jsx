@@ -1,7 +1,10 @@
+// src/components/comment/Comments.jsx
 import React, { useState, useEffect, useRef } from "react";
+import ReactDOM from "react-dom"; // Portal용 임포트
 import { addDoc, collection, serverTimestamp, query, orderBy, onSnapshot, where } from "firebase/firestore";
-import { db, auth } from "../firebase";
+import { db, auth } from "../../firebase";
 import CommentItem from "./CommentItem";
+import { X } from "lucide-react"; // 일관성 있는 X 아이콘 사용
 
 export default function Comments({ postId, onClose }) {
   const [text, setText] = useState("");
@@ -19,7 +22,7 @@ export default function Comments({ postId, onClose }) {
   }, [postId]);
 
   useEffect(() => {
-    // 스크롤 방지 로직 (보다 안정적인 방식)
+    // 뒷배경 스크롤 잠금 (Portal 마운트 시 동작)
     const scrollY = window.scrollY;
     document.body.style.position = 'fixed';
     document.body.style.top = `-${scrollY}px`;
@@ -58,14 +61,24 @@ export default function Comments({ postId, onClose }) {
 
   const parentComments = comments.filter((c) => !c.parentId);
 
-  return (
-    <div className="fixed inset-0 bg-black/60 z-[1000] flex items-end sm:items-center justify-center">
-      <div className="bg-white w-full h-[95vh] sm:h-[80vh] sm:max-w-lg sm:rounded-2xl flex flex-col overflow-hidden">
-        <div className="flex justify-between items-center px-6 py-4 border-b">
-          <h3 className="font-bold text-slate-700">댓글</h3>
-          <button onClick={onClose} className="text-slate-400">✕</button>
+  // ReactDOM.createPortal을 사용해 document.body에 직접 바인딩하여 찌그러짐 원천 방어
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 bg-black/60 z-[1000] flex items-end sm:items-center justify-center backdrop-blur-sm">
+      <div className="bg-[#fdfbf7] w-full h-[90vh] sm:h-[80vh] sm:max-w-lg rounded-t-[32px] sm:rounded-[32px] flex flex-col overflow-hidden shadow-2xl border border-white/50 animate-in fade-in slide-in-from-bottom-8 duration-200">
+        
+        {/* 헤더 영역 */}
+        <div className="flex justify-between items-center px-6 py-4 border-b border-orange-100 bg-white/50">
+          <h3 className="font-black text-slate-800 tracking-tight text-base">댓글</h3>
+          <button 
+            onClick={onClose} 
+            className="text-slate-400 hover:bg-slate-100 p-1.5 rounded-full transition-colors cursor-pointer"
+          >
+            <X size={20} />
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+        {/* 댓글 목록 리스트 */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
           {parentComments.map((parent) => {
             const replies = comments.filter((r) => r.parentId === parent.id);
             const isExpanded = expandedParents[parent.id];
@@ -73,8 +86,10 @@ export default function Comments({ postId, onClose }) {
               <div key={parent.id} className="space-y-4">
                 <CommentItem comment={parent} onReply={handleReplyClick} isReply={false} />
                 {replies.length > 0 && (
-                  <button onClick={() => setExpandedParents(prev => ({ ...prev, [parent.id]: !prev[parent.id] }))} 
-                    className="ml-10 text-xs font-bold text-blue-500 hover:text-blue-600">
+                  <button 
+                    onClick={() => setExpandedParents(prev => ({ ...prev, [parent.id]: !prev[parent.id] }))} 
+                    className="ml-10 text-xs font-black text-[#c29b7c] hover:text-[#b08968] transition-colors cursor-pointer"
+                  >
                     {isExpanded ? `▲ 답글 ${replies.length}개 숨기기` : `▼ 답글 ${replies.length}개 보기`}
                   </button>
                 )}
@@ -85,19 +100,34 @@ export default function Comments({ postId, onClose }) {
             );
           })}
         </div>
-        <div className="p-4 border-t bg-white">
+
+        {/* 하단 입력 폼 */}
+        <div className="p-4 border-t border-orange-100 bg-white">
           {replyTo && (
-            <div className="px-2 py-1 mb-2 text-xs flex justify-between bg-slate-50 rounded">
+            <div className="px-3 py-1.5 mb-2 text-xs flex justify-between bg-orange-50/50 text-slate-600 rounded-xl border border-orange-100/50">
               <span><b>{replyTo.nickname}</b>님에게 답글 중</span>
-              <button onClick={() => setReplyTo(null)}>✕</button>
+              <button onClick={() => setReplyTo(null)} className="text-slate-400 font-bold cursor-pointer">✕</button>
             </div>
           )}
           <form onSubmit={handleSubmit} className="flex gap-2">
-            <input ref={inputRef} className="flex-1 bg-slate-100 rounded-xl px-4 py-2 text-sm" value={text} onChange={(e) => setText(e.target.value)} placeholder="댓글 입력..." />
-            <button type="submit" className="text-blue-500 font-bold text-sm" disabled={!text.trim()}>게시</button>
+            <input 
+              ref={inputRef} 
+              className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-[#c29b7c] focus:bg-white transition-all text-slate-700" 
+              value={text} 
+              onChange={(e) => setText(e.target.value)} 
+              placeholder="댓글 입력..." 
+            />
+            <button 
+              type="submit" 
+              className="text-[#c29b7c] hover:text-[#b08968] font-black text-sm px-4 transition-colors cursor-pointer" 
+              disabled={!text.trim()}
+            >
+              게시
+            </button>
           </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

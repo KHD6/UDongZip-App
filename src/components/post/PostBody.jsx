@@ -1,3 +1,4 @@
+// src/components/post/PostBody.jsx
 import React, { useEffect, useRef } from "react";
 
 export default function PostBody({
@@ -10,7 +11,6 @@ export default function PostBody({
 }) {
   const scrollContainerRef = useRef(null);
 
-  // !!추가된 내용!!: currentIndex가 변할 때마다 스크롤 위치 이동
   useEffect(() => {
     if (scrollContainerRef.current) {
       const container = scrollContainerRef.current;
@@ -32,35 +32,34 @@ export default function PostBody({
   return (
     <div className="mb-4">
       {mediaList?.length > 0 && (
-        <div className="aspect-video bg-slate-50 rounded-2xl relative group overflow-hidden mb-4">
-          
-          {/* !!추가된 내용!!: 1/4 표시 인디케이터 */}
-          <div className="absolute top-4 right-4 z-20 bg-black/40 backdrop-blur-md text-white text-xs px-2 py-1 rounded-full">
+        <div className="aspect-video bg-slate-50/50 rounded-[24px] border border-slate-100/50 relative group overflow-hidden mb-4 shadow-inner">
+          {/* 캡슐형 인디케이터 */}
+          <div className="absolute top-4 right-4 z-20 bg-black/40 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-full tracking-wider">
             {currentIndex + 1} / {mediaList.length}
           </div>
 
-          {/* !!추가된 내용!!: 좌우 화살표 버튼 */}
+          {/* 슬라이드 화살표 */}
           {mediaList.length > 1 && (
             <>
               {currentIndex > 0 && (
                 <button 
                   onClick={handlePrev} 
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-white/80 p-2 rounded-full shadow hover:bg-white"
-                >◀</button>
+                  className="absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-white/95 hover:bg-white p-2 rounded-full shadow-md transition-all cursor-pointer text-slate-700 text-xs font-black"
+                >〈</button>
               )}
               {currentIndex < mediaList.length - 1 && (
                 <button 
                   onClick={handleNext} 
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-white/80 p-2 rounded-full shadow hover:bg-white"
-                >▶</button>
+                  className="absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-white/95 hover:bg-white p-2 rounded-full shadow-md transition-all cursor-pointer text-slate-700 text-xs font-black"
+                >〉</button>
               )}
             </>
           )}
 
-          {/* //!??수정되기전 삭제된 내용??!: 중복되던 두 번째 map 블록 삭제됨 */}
           <div
             ref={scrollContainerRef}
             className="w-full h-full flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {mediaList.map((item, idx) => (
               <div
@@ -89,7 +88,7 @@ export default function PostBody({
           </div>
         </div>
       )}
-      <p className="text-slate-600 leading-relaxed whitespace-pre-line">
+      <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-line px-1">
         {content}
       </p>
     </div>

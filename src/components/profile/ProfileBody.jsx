@@ -1,6 +1,6 @@
 // src/components/profile/ProfileBody.jsx
 import React from "react";
-import PostCard from "../PostCard";
+import PostCard from "../post/PostCard";
 import UserList from "./UserList";
 
 export default function ProfileBody({ 

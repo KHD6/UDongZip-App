@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { storage, auth } from "../firebase"; // auth를 import합니다.
+import { storage, auth } from "../../firebase"; // auth를 import합니다.
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 function PostForm({ onSubmit, onClose }) {

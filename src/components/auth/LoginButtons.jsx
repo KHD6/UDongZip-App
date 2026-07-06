@@ -1,5 +1,6 @@
 // src/components/LoginButtons.jsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom"; // 리다이렉션을 위한 import
 import { 
   signInWithPopup, 
   GoogleAuthProvider, 
@@ -7,11 +8,13 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword 
 } from "firebase/auth";
-import { auth } from "../firebase";
-import { Mail, Lock, Globe, User, LogIn } from "lucide-react";
+import { auth } from "../../firebase";
+import { Mail, Lock, Globe, LogIn, CheckCircle2, AlertCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function LoginButtons() {
-  const [isLogin, setIsLogin] = useState(true); // true: 로그인, false: 회원가입
+  const navigate = useNavigate(); // 네비게이트 함수 초기화
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,7 +22,6 @@ export default function LoginButtons() {
 
   const googleProvider = new GoogleAuthProvider();
 
-  // Firebase 에러 메시지 한글 변환
   const getErrorMessage = (code) => {
     switch (code) {
       case "auth/user-not-found": return "등록되지 않은 이메일입니다.";
@@ -27,9 +29,13 @@ export default function LoginButtons() {
       case "auth/email-already-in-use": return "이미 사용 중인 이메일입니다.";
       case "auth/weak-password": return "비밀번호는 6자리 이상이어야 합니다.";
       case "auth/invalid-email": return "유효하지 않은 이메일 형식입니다.";
-      case "auth/operation-not-allowed": return "이 로그인 방식은 현재 비활성화되어 있습니다.";
       default: return "인증에 실패했습니다. 다시 시도해주세요.";
     }
+  };
+
+  // 공통 리다이렉션 처리 함수
+  const onSuccess = () => {
+    navigate("/"); // 성공 시 메인(타임라인)으로 이동
   };
 
   const handleEmailAuth = async (e) => {
@@ -44,27 +50,40 @@ export default function LoginButtons() {
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
       }
+      onSuccess(); // 성공 후 이동
     } catch (err) {
-      console.error(err.code);
       setError(getErrorMessage(err.code));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = () => signInWithPopup(auth, googleProvider);
-  const handleAnonymousLogin = () => signInAnonymously(auth);
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      onSuccess(); // 성공 후 이동
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAnonymousLogin = async () => {
+    try {
+      await signInAnonymously(auth);
+      onSuccess(); // 성공 후 이동
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <div className="w-full max-w-[400px] px-6 py-12 flex flex-col items-center bg-[#fdfbf7] min-h-screen justify-center">
-      {/* 로고 영역 */}
       <div className="mb-10 text-center">
-        <div className="text-5xl mb-4 cursor-default">🐾</div>
+        <div className="text-5xl mb-4 cursor-default text-slate-800">🐾</div>
         <h1 className="text-3xl font-black text-slate-800 tracking-tighter cursor-default">우리 동네 집사들</h1>
         <p className="text-slate-400 text-sm font-bold mt-2 cursor-default">우동집에서 시작하는 따뜻한 반려동물 일상</p>
       </div>
 
-      {/* 로그인/회원가입 탭 */}
       <div className="w-full flex bg-slate-100 p-1 rounded-2xl mb-6">
         <button 
           onClick={() => { setIsLogin(true); setError(""); }}
@@ -84,7 +103,6 @@ export default function LoginButtons() {
         </button>
       </div>
 
-      {/* 이메일 인증 폼 */}
       <form onSubmit={handleEmailAuth} className="w-full space-y-3">
         <div className="relative group">
           <Mail 
@@ -115,11 +133,18 @@ export default function LoginButtons() {
           />
         </div>
 
-        {error && (
-          <p className="text-red-500 text-xs font-bold px-2 animate-in fade-in slide-in-from-top-1">
-            {error}
-          </p>
-        )}
+        <AnimatePresence>
+          {error && (
+            <motion.p 
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="text-red-500 text-xs font-bold px-2 flex items-center gap-1"
+            >
+              <AlertCircle size={12} /> {error}
+            </motion.p>
+          )}
+        </AnimatePresence>
 
         <button 
           type="submit" 
@@ -130,14 +155,12 @@ export default function LoginButtons() {
         </button>
       </form>
 
-      {/* 구분선 */}
       <div className="w-full flex items-center my-8 gap-4">
         <div className="flex-1 h-[1px] bg-slate-200" />
         <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest cursor-default">또는</span>
         <div className="flex-1 h-[1px] bg-slate-200" />
       </div>
 
-      {/* 소셜 및 익명 로그인 버튼 */}
       <div className="w-full space-y-3">
         <button 
           onClick={handleGoogleLogin}

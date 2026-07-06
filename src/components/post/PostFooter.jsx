@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { db, auth } from "../firebase";
+// src/components/post/PostFooter.jsx
+import React, { useState, useEffect } from "react";
+import { db, auth } from "../../firebase";
 import {
   collection,
   addDoc,
@@ -9,8 +10,8 @@ import {
   onSnapshot,
   doc,
 } from "firebase/firestore";
-import Comments from "./Comments";
-import RelativeTime from "./RelativeTime";
+import Comments from "../comment/Comments";
+import RelativeTime from "../common/RelativeTime";
 
 export default function PostFooter({ postId, createdAt }) {
   const [likes, setLikes] = useState([]);
@@ -19,7 +20,6 @@ export default function PostFooter({ postId, createdAt }) {
 
   const isLiked = likes.find((like) => like.uid === auth.currentUser?.uid);
 
-  // 좋아요 구독
   useEffect(() => {
     if (!postId) return;
     const q = query(collection(db, "likes"), where("postId", "==", postId));
@@ -29,7 +29,6 @@ export default function PostFooter({ postId, createdAt }) {
     return () => unsubscribe();
   }, [postId]);
 
-  // 댓글 구독
   useEffect(() => {
     if (!postId) return;
     const q = query(collection(db, "comments"), where("postId", "==", postId));
@@ -57,33 +56,30 @@ export default function PostFooter({ postId, createdAt }) {
 
   return (
     <>
-      <div className="flex justify-between -4 pt-4 border-t border-slate-100">
+      <div className="flex justify-between items-center pt-4 border-t border-slate-100/60 mt-4 px-1">
         <div className="flex gap-4">
           <button
             onClick={toggleLike}
-            className="flex items-center gap-1 transition-transform active:scale-95 cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-all cursor-pointer text-xs font-bold text-slate-600"
           >
-            {isLiked ? "❤️" : "🤍"}
-            <span className="text-sm text-slate-500">{likes.length}</span>
+            <span>{isLiked ? "❤️" : "🤍"}</span>
+            <span>{likes.length}</span>
           </button>
 
           <button
             onClick={() => setIsCommentOpen(true)}
-            className="flex items-center gap-1 cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-all cursor-pointer text-xs font-bold text-slate-600"
           >
-            💬{" "}
-            {comments.length > 0 && (
-              <span className="text-sm text-slate-500">{comments.length}</span>
-            )}
+            <span>💬</span>
+            {comments.length > 0 && <span>{comments.length}</span>}
           </button>
         </div>
 
-        <div className="py-2">
+        <div>
           <RelativeTime createdAt={createdAt} />
         </div>
       </div>
 
-      {/* 댓글 모달 */}
       {isCommentOpen && (
         <Comments postId={postId} onClose={() => setIsCommentOpen(false)} />
       )}

@@ -1,7 +1,7 @@
 // src/components/EditProfileModal.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { setDoc, doc } from "firebase/firestore";
-import { auth, db, storage } from "../firebase";
+import { auth, db, storage } from "../../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Camera, X, Trash2 } from "lucide-react";
 import { motion, useAnimation } from "framer-motion";

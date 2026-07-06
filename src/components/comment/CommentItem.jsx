@@ -1,8 +1,9 @@
+// src/components/comment/CommentItem.jsx
 import React, { useState } from "react";
 import { doc, deleteDoc, updateDoc } from "firebase/firestore";
-import { db, auth } from "../firebase";
-import RelativeTime from "./RelativeTime";
-import ActionMenu from "./ActionMenu";
+import { db, auth } from "../../firebase";
+import RelativeTime from "../common/RelativeTime";
+import ActionMenu from "../post/ActionMenu";
 
 export default function CommentItem({ comment, onReply, isReply = false }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -32,10 +33,10 @@ export default function CommentItem({ comment, onReply, isReply = false }) {
 
   return (
     <div className={`flex gap-3 ${isReply ? "ml-10 mt-2" : "mt-4"}`}>
-      {/* 프로필 이미지 */}
+      {/* 프로필 이미지 (디자인 미세 수정) */}
       <img 
         src={comment.photoURL || "/default-profile.png"} 
-        className="w-8 h-8 rounded-full object-cover" 
+        className="w-8 h-8 rounded-full object-cover border border-slate-100 shadow-sm" 
         alt="profile" 
       />
       
@@ -43,8 +44,8 @@ export default function CommentItem({ comment, onReply, isReply = false }) {
         {/* 헤더 영역: 이름, 시간, ... 메뉴 */}
         <div className="flex w-full justify-between items-start">
           <div className="flex items-center gap-2 h-7">
-            <span className="font-bold text-sm text-slate-800">{comment.nickname}</span>
-            <span className="text-xs text-slate-400">
+            <span className="font-extrabold text-sm text-slate-800">{comment.nickname}</span>
+            <span className="text-[10px] text-slate-400 font-bold">
               <RelativeTime createdAt={comment.createdAt} />
             </span>
           </div>
@@ -54,33 +55,33 @@ export default function CommentItem({ comment, onReply, isReply = false }) {
             <ActionMenu 
               onEdit={isOwner ? () => setIsEditing(true) : null} 
               onDelete={isOwner ? handleDelete : null} 
-              onReport={() => alert("신고되었습니다. (업데이트 예정)")} 
+              onReport={() => alert("신고되었습니다. 신속히 처리하겠습니다. 🐾")} 
             />
           )}
         </div>
 
         {/* 댓글 내용 또는 수정 입력창 */}
         {isEditing ? (
-          <div className="w-full mt-1">
+          <div className="w-full mt-1.5">
             <textarea 
-              className="w-full bg-slate-50 border p-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" 
+              className="w-full bg-slate-50 border border-slate-100 p-2 rounded-xl text-sm outline-none focus:border-[#c29b7c] focus:bg-white transition-all text-slate-700" 
               value={editText} 
               onChange={(e) => setEditText(e.target.value)} 
             />
-            <div className="flex gap-2 mt-1">
-              <button onClick={handleUpdate} className="text-xs text-blue-600 font-bold">저장</button>
-              <button onClick={() => setIsEditing(false)} className="text-xs text-slate-400">취소</button>
+            <div className="flex gap-2.5 mt-1.5 px-1">
+              <button onClick={handleUpdate} className="text-xs text-[#c29b7c] hover:text-[#b08968] font-black cursor-pointer transition-colors">저장</button>
+              <button onClick={() => setIsEditing(false)} className="text-xs text-slate-400 font-bold cursor-pointer transition-colors">취소</button>
             </div>
           </div>
         ) : (
-          <p className="text-sm text-slate-700">{comment.text}</p>
+          <p className="text-sm text-slate-700 leading-relaxed font-medium">{comment.text}</p>
         )}
 
         {/* 답글 달기 버튼 (답글에는 표시 안 함) */}
         {!isEditing && !isReply && (
           <button 
             onClick={() => onReply(comment)} 
-            className="text-xs font-semibold text-slate-400 hover:text-slate-600 mt-1"
+            className="text-xs font-black text-slate-400 hover:text-[#c29b7c] mt-1.5 transition-colors cursor-pointer"
           >
             답글 달기
           </button>

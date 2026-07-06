@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
-import EditProfileModal from "../components/EditProfileModal";
+import EditProfileModal from "../components/profile/EditProfileModal";
 import ProfileHeader from "../components/profile/ProfileHeader";
 import ProfileBody from "../components/profile/ProfileBody";
 
