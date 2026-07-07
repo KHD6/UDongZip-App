@@ -1,6 +1,6 @@
-// src/components/EditProfileModal.jsx
+// src/components/profile/EditProfileModal.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { setDoc, doc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore"; // ❗ setDoc 임포트 누락 버그 해결
 import { auth, db, storage } from "../../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Camera, X, Trash2 } from "lucide-react";
@@ -40,7 +40,6 @@ export default function EditProfileModal({ userData, uid, onClose, onUpdate }) {
     if (!file) return;
     setIsUploading(true);
     try {
-      // 업로드 시에도 현재 로그인한 사용자의 UID를 사용하여 경로 지정
       const currentUid = auth.currentUser.uid;
       const path = type === 'profile' ? `users/${currentUid}/profile` : `pets/${currentUid}/${Date.now()}_${file.name}`;
       const storageRef = ref(storage, path);
@@ -68,9 +67,9 @@ export default function EditProfileModal({ userData, uid, onClose, onUpdate }) {
 
     setIsUploading(true);
     try {
-      // ❗ 수동 체크 로직 제거: 보안 규칙이 서버에서 처리함
-      const userRef = doc(db, "users", auth.currentUser.uid);
+      if (auth.currentUser.uid !== uid) throw new Error("Permission Denied");
       
+      const userRef = doc(db, "users", uid);
       await setDoc(userRef, {
         displayName,
         bio,
@@ -114,6 +113,7 @@ export default function EditProfileModal({ userData, uid, onClose, onUpdate }) {
         </div>
 
         <div className="overflow-y-auto p-6 space-y-8 scrollbar-hide">
+          {/* 유저 프로필 이미지 영역 */}
           <div className="flex flex-col items-center">
             <label className="relative w-28 h-24 rounded-[32px] overflow-hidden cursor-pointer group border-4 border-white shadow-lg bg-white">
               <img src={photoURL} className="w-full h-full object-cover" alt="profile" />
@@ -124,6 +124,7 @@ export default function EditProfileModal({ userData, uid, onClose, onUpdate }) {
             </label>
           </div>
 
+          {/* 유저 닉네임 & 자기소개 */}
           <div className="space-y-4">
             <motion.div 
               animate={nameControls} 
@@ -157,6 +158,7 @@ export default function EditProfileModal({ userData, uid, onClose, onUpdate }) {
             </div>
           </div>
 
+          {/* 펫 리스트 영역 */}
           <div className="pt-2 border-t border-orange-50">
             <div className="flex justify-between items-center mb-4 px-2">
               <h3 className="font-black text-slate-800 flex items-center gap-2 text-sm">
@@ -170,12 +172,13 @@ export default function EditProfileModal({ userData, uid, onClose, onUpdate }) {
               </button>
             </div>
             
-            <div className="space-y-4">
+            <div className="max-h-[320px] overflow-y-auto pr-2 space-y-4 scrollbar-hide">
               {pets.map((pet, i) => (
-                <div key={i} className="bg-white rounded-[24px] p-4 shadow-sm border border-orange-50 relative group/item">
+                <div key={i} className="bg-white rounded-[28px] p-4 shadow-sm border border-orange-50 relative group/item animate-in fade-in zoom-in-95 duration-200">
+                  {/* 사용자 정의 둥근 삭제 버튼 */}
                   <button 
                     onClick={() => setPets(pets.filter((_, idx) => idx !== i))} 
-                    className="absolute top-4 right-4 text-slate-200 hover:text-red-400 cursor-pointer transition-colors"
+                    className="absolute top-0 right-[-8px] text-slate-200 hover:text-red-400 cursor-pointer transition-colors bg-amber-800 rounded-[50%] p-1.5 z-10"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -187,23 +190,24 @@ export default function EditProfileModal({ userData, uid, onClose, onUpdate }) {
                       </div>
                       <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'pet', i)} />
                     </label>
-                    <div className="flex-1 space-y-2">
+                    
+                    <div className="flex-1 space-y-2 min-w-0">
                       <input 
                         placeholder="아이 이름" 
-                        className="w-full bg-[#fdfbf7] rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-1 focus:ring-[#c29b7c]/30" 
+                        className="w-full bg-[#fdfbf7] rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-1 focus:ring-[#c29b7c]/30 text-slate-700" 
                         value={pet.name} 
                         onChange={(e) => { const n = [...pets]; n[i].name = e.target.value; setPets(n); }} 
                       />
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <input 
                           placeholder="종족" 
-                          className="flex-1 bg-[#fdfbf7] rounded-xl px-3 py-2 text-[11px] font-bold outline-none" 
+                          className="w-full sm:flex-1 bg-[#fdfbf7] rounded-xl px-3 py-2 text-[11px] font-bold outline-none focus:ring-1 focus:ring-[#c29b7c]/30 text-slate-700" 
                           value={pet.species} 
                           onChange={(e) => { const n = [...pets]; n[i].species = e.target.value; setPets(n); }} 
                         />
                         <input 
                           type="date" 
-                          className="flex-1 bg-[#fdfbf7] rounded-xl px-3 py-2 text-[11px] font-bold outline-none text-slate-500" 
+                          className="w-full sm:flex-1 bg-[#fdfbf7] rounded-xl px-3 py-2 text-[11px] font-bold outline-none text-slate-500 cursor-pointer" 
                           value={pet.birthday} 
                           onChange={(e) => { const n = [...pets]; n[i].birthday = e.target.value; setPets(n); }} 
                         />
