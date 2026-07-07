@@ -5,25 +5,34 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { db, auth } from "./firebase";
 import { getDoc, doc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 
+// Layout 컴포넌트
 import Navigation from "./components/layout/Navigation";
-import MainContent from "./components/post/MainContent";
 import RightSidebar from "./components/layout/RightSidebar";
-import PostDetailPage from "./pages/PostDetailPage";
+
+// Auth 컴포넌트
 import LoginButtons from "./components/auth/LoginButtons";
 import NicknameSetupModal from "./components/auth/NicknameSetupModal";
+
+// Post 및 메인 컨텐츠
+import MainContent from "./components/post/MainContent";
 import PostForm from "./components/post/PostForm";
-import ProfilePage from "./pages/ProfilePage";
+
+// Common 컴포넌트
 import MediaViewer from "./components/common/MediaViewer";
 
-const AIRecommendPage = () => <div className="p-4">🤖 AI 페이지</div>;
-const MapPage = () => <div className="p-4">📍 지도 페이지</div>;
+// Pages
+import PostDetailPage from "./pages/PostDetailPage";
+import ProfilePage from "./pages/ProfilePage";
+import AIRecommendPage from "./pages/AIRecommendPage"; // ❗ 임시 컴포넌트 대신 신규 파일 임포트
+
+const MapPage = () => <div className="p-4 bg-[#fdfbf7] min-h-screen">📍 지도 페이지</div>;
 
 function SettingsPage() {
   const handleLogout = () => { if (window.confirm("로그아웃 하시겠습니까?")) auth.signOut(); };
   return (
-    <div className="max-w-md mx-auto p-6 bg-white rounded-2xl shadow-sm border border-slate-100 my-4">
-      <h2 className="text-xl font-bold mb-6">⚙️ 환경설정</h2>
-      <button onClick={handleLogout} className="text-red-600 cursor-pointer">로그아웃</button>
+    <div className="max-w-md mx-auto p-6 bg-white rounded-[32px] shadow-sm border border-slate-100 my-4">
+      <h2 className="text-xl font-black mb-6">⚙️ 환경설정</h2>
+      <button onClick={handleLogout} className="text-red-600 font-bold cursor-pointer hover:underline">로그아웃</button>
     </div>
   );
 }
@@ -40,7 +49,11 @@ function AppContent() {
   const [volume, setVolume] = useState(0.8);
   const [viewer, setViewer] = useState({ isOpen: false, list: [], index: 0, onClose: null });
 
-  const handleOpenWriteModal = () => setIsWriteModalOpen(true);
+  const handleOpenWriteModal = () => {
+    if (!auth.currentUser || auth.currentUser.isAnonymous) { alert("로그인 후 이용 가능합니다."); return; }
+    setIsWriteModalOpen(true);
+  };
+
   const handleSavePost = async (postData) => {
     await addDoc(collection(db, "posts"), {
       content: postData.content, mediaList: postData.mediaList,
@@ -70,18 +83,18 @@ function AppContent() {
     checkNickname();
   }, [user]);
 
-  if (loading) return <div>🐾 로딩 중...</div>;
+  if (loading) return <div className="flex items-center justify-center min-h-screen bg-[#fdfbf7]">🐾</div>;
   if (user && !isReady) return <NicknameSetupModal user={user} />;
-  if (!user) return <div className="flex flex-col items-center justify-center min-h-screen"><LoginButtons /></div>;
+  if (!user) return <div className="min-h-screen bg-[#fdfbf7] flex items-center justify-center"><LoginButtons /></div>;
 
   return (
-    <div className="min-h-screen bg-[#f9f4ec] w-full relative">
+    <div className="min-h-screen bg-[#fdfbf7] w-full relative">
       <Navigation isNavVisible={isNavVisible} onNewPostClick={handleOpenWriteModal} />
-      <div className="pt-[52px] md:pt-0 md:ml-[100px] xl:ml-[220px] min-h-screen flex justify-center px-4">
+      <div className="pt-[52px] md:pt-0 md:ml-[100px] xl:ml-[220px] min-h-screen flex justify-center px-4 transition-all duration-300">
         <div className="flex w-full max-w-[950px] justify-center lg:justify-start">
-          <main className="w-full max-w-[600px] border-x border-slate-100 min-h-screen pb-20 md:pb-0">
+          <main className="w-full max-w-[600px] border-x border-slate-100/60 min-h-screen pb-20 md:pb-0">
             <Routes>
-              <Route path="/" element={<MainContent refreshKey={refreshKey} onOpenWriteModal={handleOpenWriteModal} setViewer={setViewer} volume={volume} setVolume={setVolume} />} />
+              <Route path="/" element={<MainContent refreshKey={refreshKey} onOpenWriteModal={handleOpenWriteModal} setViewer={setViewer} volume={volume} setVolume={setVolume} isNavVisible={isNavVisible} />} />
               <Route path="/recommend" element={<AIRecommendPage />} />
               <Route path="/map" element={<MapPage />} />
               <Route path="/settings" element={<SettingsPage />} />
@@ -97,8 +110,7 @@ function AppContent() {
       
       {viewer.isOpen && (
         <MediaViewer
-          mediaList={viewer.list}
-          initialIndex={viewer.index}
+          {...viewer}
           volume={volume}
           onVolumeChange={setVolume}
           onClose={(lastIndex) => {
