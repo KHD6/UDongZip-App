@@ -1,10 +1,11 @@
+// src/components/common/VolumeControl.jsx
 import React, { useState } from "react";
 
-function VolumeControl({ volume, onVolumeChange }) {
-  // 이전 볼륨을 기억하기 위한 상태 (음소거 해제 시 사용)
+export default function VolumeControl({ volume, onVolumeChange }) {
   const [lastVolume, setLastVolume] = useState(volume > 0 ? volume : 0.5);
 
-  const toggleMute = () => {
+  const toggleMute = (e) => {
+    e.stopPropagation(); // 이벤트 전파 방지
     if (volume > 0) {
       setLastVolume(volume);
       onVolumeChange(0);
@@ -14,7 +15,7 @@ function VolumeControl({ volume, onVolumeChange }) {
   };
 
   return (
-    <div className="flex flex-col items-center gap-2 bg-black/70 p-3 rounded-lg shadow-lg">
+    <div className="flex flex-col items-center gap-2 bg-black/70 p-3 rounded-lg shadow-lg" onClick={(e) => e.stopPropagation()}>
       <input
         type="range"
         min="0"
@@ -25,6 +26,7 @@ function VolumeControl({ volume, onVolumeChange }) {
         className="cursor-pointer accent-white"
         style={{ 
           appearance: 'slider-vertical', 
+          WebkitAppearance: 'slider-vertical',
           width: '8px', 
           height: '100px' 
         }}
@@ -38,5 +40,3 @@ function VolumeControl({ volume, onVolumeChange }) {
     </div>
   );
 }
-
-export default VolumeControl;

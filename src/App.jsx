@@ -1,30 +1,21 @@
 // src/App.jsx
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext";
+import { ViewerProvider } from "./context/ViewerContext";
 import { db, auth } from "./firebase";
 import { getDoc, doc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 
-// Layout 컴포넌트
 import Navigation from "./components/layout/Navigation";
+import MainContent from "./components/post/MainContent";
 import RightSidebar from "./components/layout/RightSidebar";
-
-// Auth 컴포넌트
+import PostDetailPage from "./pages/PostDetailPage";
 import LoginButtons from "./components/auth/LoginButtons";
 import NicknameSetupModal from "./components/auth/NicknameSetupModal";
-
-// Post 및 메인 컨텐츠
-import MainContent from "./components/post/MainContent";
 import PostForm from "./components/post/PostForm";
-
-// Common 컴포넌트
-import MediaViewer from "./components/common/MediaViewer";
-
-// Pages
-import PostDetailPage from "./pages/PostDetailPage";
 import ProfilePage from "./pages/ProfilePage";
-import AIRecommendPage from "./pages/AIRecommendPage"; // ❗ 임시 컴포넌트 대신 신규 파일 임포트
 
+const AIRecommendPage = () => <div className="p-4 bg-[#fdfbf7] min-h-screen">🤖 AI 페이지</div>;
 const MapPage = () => <div className="p-4 bg-[#fdfbf7] min-h-screen">📍 지도 페이지</div>;
 
 function SettingsPage() {
@@ -38,16 +29,12 @@ function SettingsPage() {
 }
 
 function AppContent() {
-  const { user } = useAuth();
   const [isReady, setIsReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
-
-  const [volume, setVolume] = useState(0.8);
-  const [viewer, setViewer] = useState({ isOpen: false, list: [], index: 0, onClose: null });
 
   const handleOpenWriteModal = () => {
     if (!auth.currentUser || auth.currentUser.isAnonymous) { alert("로그인 후 이용 가능합니다."); return; }
@@ -74,18 +61,18 @@ function AppContent() {
   }, [lastScrollY]);
 
   useEffect(() => {
-    if (!user) { setLoading(false); return; }
-    const checkNickname = async () => {
+    const checkUser = auth.onAuthStateChanged(async (user) => {
+      if (!user) { setLoading(false); return; }
       const userDoc = await getDoc(doc(db, "users", user.uid));
       setIsReady(userDoc.exists() && userDoc.data().isNicknameSet);
       setLoading(false);
-    };
-    checkNickname();
-  }, [user]);
+    });
+    return checkUser;
+  }, []);
 
   if (loading) return <div className="flex items-center justify-center min-h-screen bg-[#fdfbf7]">🐾</div>;
-  if (user && !isReady) return <NicknameSetupModal user={user} />;
-  if (!user) return <div className="min-h-screen bg-[#fdfbf7] flex items-center justify-center"><LoginButtons /></div>;
+  if (auth.currentUser && !isReady) return <NicknameSetupModal user={auth.currentUser} />;
+  if (!auth.currentUser) return <div className="min-h-screen bg-[#fdfbf7] flex items-center justify-center"><LoginButtons /></div>;
 
   return (
     <div className="min-h-screen bg-[#fdfbf7] w-full relative">
@@ -94,33 +81,30 @@ function AppContent() {
         <div className="flex w-full max-w-[950px] justify-center lg:justify-start">
           <main className="w-full max-w-[600px] border-x border-slate-100/60 min-h-screen pb-20 md:pb-0">
             <Routes>
-              <Route path="/" element={<MainContent refreshKey={refreshKey} onOpenWriteModal={handleOpenWriteModal} setViewer={setViewer} volume={volume} setVolume={setVolume} isNavVisible={isNavVisible} />} />
+              <Route path="/" element={<MainContent refreshKey={refreshKey} onOpenWriteModal={handleOpenWriteModal} isNavVisible={isNavVisible} />} />
               <Route path="/recommend" element={<AIRecommendPage />} />
               <Route path="/map" element={<MapPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/post/:postId" element={<PostDetailPage />} />
-              <Route path="/profile/:uid" element={<ProfilePage setViewer={setViewer} volume={volume} setVolume={setVolume} />} />
+              <Route path="/profile/:uid" element={<ProfilePage />} />
             </Routes>
           </main>
           <aside className="hidden lg:block w-[350px] pl-8 py-4"><div className="sticky top-4"><RightSidebar /></div></aside>
         </div>
       </div>
-
       {isWriteModalOpen && <PostForm onSubmit={handleSavePost} onClose={() => setIsWriteModalOpen(false)} />}
-      
-      {viewer.isOpen && (
-        <MediaViewer
-          {...viewer}
-          volume={volume}
-          onVolumeChange={setVolume}
-          onClose={(lastIndex) => {
-            if (viewer.onClose) viewer.onClose(lastIndex);
-            setViewer(prev => ({ ...prev, isOpen: false }));
-          }}
-        />
-      )}
     </div>
   );
 }
 
-export default function App() { return <BrowserRouter><AuthProvider><AppContent /></AuthProvider></BrowserRouter>; }
+export default function App() { 
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <ViewerProvider>
+          <AppContent />
+        </ViewerProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}

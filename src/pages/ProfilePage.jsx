@@ -1,24 +1,14 @@
 // src/pages/ProfilePage.jsx
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import {
-  doc,
-  getDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-  orderBy,
-  addDoc,
-  deleteDoc,
-} from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, deleteDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import EditProfileModal from "../components/profile/EditProfileModal";
 import ProfileHeader from "../components/profile/ProfileHeader";
 import ProfileBody from "../components/profile/ProfileBody";
 
-export default function ProfilePage({ setViewer, volume, setVolume }) {
+export default function ProfilePage({ volume, setVolume }) {
   const { uid } = useParams();
   const { fetchProfile } = useAuth();
   const [userData, setUserData] = useState(null);
@@ -27,35 +17,24 @@ export default function ProfilePage({ setViewer, volume, setVolume }) {
   const [activeTab, setActiveTab] = useState("feed");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [followerUsers, setFollowerUsers] = useState([]);
   const [followingUsers, setFollowingUsers] = useState([]);
   const [myFollowingIds, setMyFollowingIds] = useState(new Set());
+  const [isFollowing, setIsFollowing] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
-    setActiveTab("feed");
     try {
       const userDoc = await getDoc(doc(db, "users", uid));
       const data = userDoc.exists() ? userDoc.data() : {};
       setUserData(data);
 
-      const postsSnapshot = await getDocs(
-        query(collection(db, "posts"), where("uid", "==", uid), orderBy("createdAt", "desc"))
-      );
-      setUserPosts(postsSnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(), 
-        nickname: data.displayName || "집사", 
-        photoURL: data.photoURL || "/default-profile.png" 
-      })));
+      const postsSnapshot = await getDocs(query(collection(db, "posts"), where("uid", "==", uid), orderBy("createdAt", "desc")));
+      setUserPosts(postsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
-      // 1. 팔로워 목록 로드 (누가 이 사람을 팔로우하는가)
-      const followerSnap = await getDocs(
-        query(collection(db, "follows"), where("followingId", "==", uid))
-      );
+      const followerSnap = await getDocs(query(collection(db, "follows"), where("followingId", "==", uid)));
       setFollowerCount(followerSnap.size);
       const fers = await Promise.all(followerSnap.docs.map(async fDoc => {
         const uSnap = await getDoc(doc(db, "users", fDoc.data().followerId));
@@ -63,10 +42,7 @@ export default function ProfilePage({ setViewer, volume, setVolume }) {
       }));
       setFollowerUsers(fers.filter(u => u !== null));
 
-      // 2. 팔로잉 목록 로드 (이 사람이 누구를 팔로우하는가) - [수정 완료]
-      const followingSnap = await getDocs(
-        query(collection(db, "follows"), where("followerId", "==", uid))
-      );
+      const followingSnap = await getDocs(query(collection(db, "follows"), where("followerId", "==", uid)));
       setFollowingCount(followingSnap.size);
       const fings = await Promise.all(followingSnap.docs.map(async fDoc => {
         const uSnap = await getDoc(doc(db, "users", fDoc.data().followingId));
@@ -74,76 +50,36 @@ export default function ProfilePage({ setViewer, volume, setVolume }) {
       }));
       setFollowingUsers(fings.filter(u => u !== null));
 
-      // 3. 현재 로그인 유저의 팔로잉 정보 동기화
       if (auth.currentUser) {
-        const myFollowSnap = await getDocs(
-          query(collection(db, "follows"), where("followerId", "==", auth.currentUser.uid))
-        );
+        const myFollowSnap = await getDocs(query(collection(db, "follows"), where("followerId", "==", auth.currentUser.uid)));
         const myFollows = new Set(myFollowSnap.docs.map(d => d.data().followingId));
         setMyFollowingIds(myFollows);
         setIsFollowing(myFollows.has(uid));
       }
-    } catch (err) { 
-      console.error("데이터 로딩 실패:", err); 
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  useEffect(() => { 
-    fetchData(); 
-  }, [uid]);
+  useEffect(() => { fetchData(); }, [uid]);
 
   const toggleFollow = async (targetUid) => {
     if (!auth.currentUser || auth.currentUser.uid === targetUid) return;
     try {
       const isCurrentlyFollowing = myFollowingIds.has(targetUid);
       if (isCurrentlyFollowing) {
-        const q = query(
-          collection(db, "follows"), 
-          where("followerId", "==", auth.currentUser.uid), 
-          where("followingId", "==", targetUid)
-        );
+        const q = query(collection(db, "follows"), where("followerId", "==", auth.currentUser.uid), where("followingId", "==", targetUid));
         const snap = await getDocs(q);
         snap.forEach(d => deleteDoc(doc(db, "follows", d.id)));
-        
-        setMyFollowingIds(prev => {
-          const next = new Set(prev);
-          next.delete(targetUid);
-          return next;
-        });
-
-        if (targetUid === uid) {
-          setIsFollowing(false);
-          setFollowerCount(prev => prev - 1);
-          setFollowerUsers(prev => prev.filter(u => u.uid !== auth.currentUser.uid));
-        }
+        setMyFollowingIds(prev => { const next = new Set(prev); next.delete(targetUid); return next; });
+        if (targetUid === uid) { setIsFollowing(false); setFollowerCount(prev => prev - 1); }
       } else {
-        await addDoc(collection(db, "follows"), { 
-          followerId: auth.currentUser.uid, 
-          followingId: targetUid, 
-          createdAt: new Date() 
-        });
-        
+        await addDoc(collection(db, "follows"), { followerId: auth.currentUser.uid, followingId: targetUid, createdAt: new Date() });
         setMyFollowingIds(prev => new Set(prev).add(targetUid));
-
-        if (targetUid === uid) {
-          setIsFollowing(true);
-          setFollowerCount(prev => prev + 1);
-          const myDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-          if (myDoc.exists()) {
-            setFollowerUsers(prev => [{ uid: myDoc.id, ...myDoc.data() }, ...prev]);
-          }
-        }
+        if (targetUid === uid) { setIsFollowing(true); setFollowerCount(prev => prev + 1); }
       }
-    } catch (err) { 
-      console.error("팔로우 토글 실패:", err); 
-    }
+    } catch (err) { console.error(err); }
   };
 
-  const allMediaList = userPosts.flatMap(post => 
-    (post.mediaList || []).map(m => ({ ...m, type: m.type || "image", postId: post.id }))
-  );
+  const allMediaList = userPosts.flatMap(post => (post.mediaList || []).map(m => ({ ...m, type: m.type || "image", postId: post.id })));
 
   if (loading) return <div className="p-8 text-center text-slate-400">🐾 집사 정보를 불러오는 중...</div>;
 
@@ -154,20 +90,17 @@ export default function ProfilePage({ setViewer, volume, setVolume }) {
         followerCount={followerCount} followingCount={followingCount}
         isMe={auth.currentUser?.uid === uid} isFollowing={isFollowing}
         toggleFollow={() => toggleFollow(uid)} setIsEditModalOpen={setIsEditModalOpen}
-        setActiveTab={setActiveTab} setViewer={setViewer}
+        setActiveTab={setActiveTab}
       />
       <ProfileBody 
         activeTab={activeTab} setActiveTab={setActiveTab}
         userPosts={userPosts} allMediaList={allMediaList}
         followerUsers={followerUsers} followingUsers={followingUsers}
         myFollowingIds={myFollowingIds} toggleFollow={toggleFollow}
-        authUid={auth.currentUser?.uid} setViewer={setViewer} volume={volume}
+        authUid={auth.currentUser?.uid} volume={volume}
       />
       {isEditModalOpen && (
-        <EditProfileModal
-          userData={userData} uid={uid} onClose={() => setIsEditModalOpen(false)}
-          onUpdate={async () => { await fetchData(); await fetchProfile(uid); }}
-        />
+        <EditProfileModal userData={userData} uid={uid} onClose={() => setIsEditModalOpen(false)} onUpdate={async () => { await fetchData(); await fetchProfile(uid); }} />
       )}
     </div>
   );

@@ -1,8 +1,8 @@
-// src/components/MediaViewer.jsx
+// src/components/common/MediaViewer.jsx
 import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import VolumeControl from "./VolumeControl";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, X } from "lucide-react";
 
 export default function MediaViewer({ mediaList, initialIndex = 0, onClose, volume, onVolumeChange }) {
   const videoRef = useRef(null);
@@ -10,17 +10,24 @@ export default function MediaViewer({ mediaList, initialIndex = 0, onClose, volu
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // 1. 데이터 검증 (데이터 없을 시 렌더링 방지)
+  // 1. 방어 코드: 데이터 부재시 렌더링 방지
   if (!mediaList || !Array.isArray(mediaList) || mediaList.length === 0) return null;
 
-  // 2. 뒷배경 스크롤 방지
+  // 2. 뒷배경 스크롤 잠금
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
-  // 3. 전체화면 토글
+  // 3. 비디오 볼륨 동기화 (VolumeControl과 연동)
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = volume;
+    }
+  }, [volume, currentIndex]);
+
+  // 4. 전체화면 토글
   const toggleFullscreen = async () => {
     if (!viewerRef.current) return;
     try {
@@ -38,28 +45,22 @@ export default function MediaViewer({ mediaList, initialIndex = 0, onClose, volu
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
-  // 4. 볼륨 조절 함수
-  const updateVolume = (newVolume) => {
-    const fixedVol = Math.max(0, Math.min(1, parseFloat(newVolume.toFixed(1))));
-    if (onVolumeChange) onVolumeChange(fixedVol);
-    if (videoRef.current) videoRef.current.volume = fixedVol;
-  };
-
   // 5. 닫기 핸들러
-  const handleCloseClick = () => {
+  const handleClose = () => {
     if (document.fullscreenElement) document.exitFullscreen();
     if (onClose) onClose(currentIndex);
   };
 
-  // 6. 키보드 이벤트 핸들러 (전 기능 복구)
+  // 6. 키보드 단축키 (좌우 이동, 볼륨, 전체화면, 재생정지 복구)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+      
       if (e.key === "ArrowLeft" && currentIndex > 0) setCurrentIndex(c => c - 1);
       if (e.key === "ArrowRight" && currentIndex < mediaList.length - 1) setCurrentIndex(c => c + 1);
-      if (e.key === "ArrowUp") updateVolume(volume + 0.1);
-      if (e.key === "ArrowDown") updateVolume(volume - 0.1);
-      if (e.key === "Escape") handleCloseClick();
+      if (e.key === "ArrowUp") onVolumeChange(Math.min(1, volume + 0.1));
+      if (e.key === "ArrowDown") onVolumeChange(Math.max(0, volume - 0.1));
+      if (e.key === "Escape") handleClose();
       if (e.key === " ") {
         if (videoRef.current) {
           videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause();
@@ -68,33 +69,35 @@ export default function MediaViewer({ mediaList, initialIndex = 0, onClose, volu
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, onClose, mediaList.length, volume, onVolumeChange]);
+  }, [currentIndex, mediaList.length, volume, onVolumeChange]);
 
-  const currentMedia = mediaList[currentIndex] || mediaList[0];
+  const currentMedia = mediaList[currentIndex];
 
   return ReactDOM.createPortal(
     <div 
       ref={viewerRef} 
-      className="fixed inset-0 bg-black md:bg-slate-100/50 md:backdrop-blur-xl z-[9999] flex items-center justify-center select-none"
-      onClick={handleCloseClick} 
+      className="fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center select-none"
+      onClick={handleClose}
     >
-      {/* 우측 상단 버튼 */}
+      {/* 우측 상단 기능 버튼 */}
       <div className="absolute top-6 right-6 flex items-center gap-4 z-[10005]">
-        <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }} className="bg-white/50 hover:bg-white p-2 rounded-full text-slate-800 transition-colors shadow-sm cursor-pointer" title="전체화면">
+        <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }} className="bg-white/20 hover:bg-white/40 p-2 rounded-full text-white transition-colors shadow-sm cursor-pointer">
           {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
         </button>
-        <button onClick={(e) => { e.stopPropagation(); handleCloseClick(); }} className="bg-white/50 hover:bg-white px-3 py-2 rounded-full text-slate-800 font-bold transition-colors shadow-sm cursor-pointer">✕</button>
+        <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="bg-white/20 hover:bg-white/40 p-2 rounded-full text-white transition-colors shadow-sm cursor-pointer">
+          <X size={20} />
+        </button>
       </div>
       
-      {/* 좌우 이동 */}
+      {/* 좌우 이동 버튼 */}
       {currentIndex > 0 && (
-        <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(c => c - 1); }} className="absolute left-6 z-[10005] bg-white/50 hover:bg-white p-4 rounded-full shadow-md transition-colors cursor-pointer">〈</button>
+        <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(c => c - 1); }} className="absolute left-6 z-[10005] bg-white/20 hover:bg-white/40 p-4 rounded-full shadow-md text-white transition-colors cursor-pointer">〈</button>
       )}
       {currentIndex < mediaList.length - 1 && (
-        <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(c => c + 1); }} className="absolute right-6 z-[10005] bg-white/50 hover:bg-white p-4 rounded-full shadow-md transition-colors cursor-pointer">〉</button>
+        <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(c => c + 1); }} className="absolute right-6 z-[10005] bg-white/20 hover:bg-white/40 p-4 rounded-full shadow-md text-white transition-colors cursor-pointer">〉</button>
       )}
 
-      {/* 컨텐츠 */}
+      {/* 미디어 컨텐츠 영역 */}
       <div className="flex items-center gap-6" onClick={(e) => e.stopPropagation()}>
         <div className="rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl bg-black flex items-center justify-center">
           {currentMedia.type === "video" ? (
@@ -117,7 +120,7 @@ export default function MediaViewer({ mediaList, initialIndex = 0, onClose, volu
         
         {/* 볼륨 컨트롤 */}
         {currentMedia.type === "video" && (
-          <div className="hidden md:flex">
+          <div className="hidden md:block">
             <VolumeControl volume={volume} onVolumeChange={onVolumeChange} />
           </div>
         )}
