@@ -12,9 +12,11 @@
   "dependencies": {
     "firebase": "^12.15.0",
     "framer-motion": "^12.42.2",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.22.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.18.1",
     "react-swipeable": "^7.0.2",
     "swiper": "^14.0.1",
