@@ -10,7 +10,7 @@ export default function RightSidebar() {
           <p className="hover:text-[#c29b7c] cursor-pointer transition-colors">#태그1 🐾</p>
           <p className="hover:text-[#c29b7c] cursor-pointer transition-colors">#태그2</p>
           <p className="hover:text-[#c29b7c] cursor-pointer transition-colors">#태그3</p>
-          <p className="hover:text-[#c29b7c] cursor-pointer transition-colors">#가이드</p>
+          <p className="hover:text-[#c29b7c] cursor-pointer transition-colors">#개발중</p>
         </div>
       </div>
     </aside>

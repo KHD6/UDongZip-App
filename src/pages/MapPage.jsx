@@ -11,6 +11,29 @@ import MapHeader from "../components/map/MapHeader";
 import MapHotPlaces from "../components/map/MapHotPlaces";
 import PinCreateModal from "../components/map/PinCreateModal";
 
+// ❗ [신규 핵심] 카테고리별 완벽한 무결성 인라인 SVG 커스텀 아이콘 생성 엔진
+const createCustomIcon = (category) => {
+  let color = "#c29b7c"; // 기본 밀크 브라운
+  if (category === "hospital") color = "#ef4444"; // 동물병원 (레드)
+  if (category === "cafe") color = "#d97706"; // 펫카페 (앰버)
+  if (category === "meetup") color = "#2563eb"; // 모임장소 (블루)
+
+  // 100% 작동 보장 인라인 벡터 마크업
+  const svgIcon = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" width="34" height="34">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+    </svg>
+  `;
+
+  return L.divIcon({
+    html: svgIcon,
+    className: "custom-leaflet-icon", // 기본 스타일 초기화용 클래스명
+    iconSize: [34, 34],
+    iconAnchor: [17, 34],
+    popupAnchor: [0, -34]
+  });
+};
+
 // 지도 내부 조작을 위한 핸들러
 function MapController({ center, zoom }) {
   const map = useMap();
@@ -140,7 +163,7 @@ export default function MapPage() {
 
   return (
     <div className="w-full h-screen bg-[#fdfbf7] flex flex-col relative overflow-hidden">
-      {/* 1단계: 검색 및 필터 헤더 */}
+      {/* 검색 및 필터 헤더 */}
       <MapHeader 
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -163,8 +186,9 @@ export default function MapPage() {
           />
           <MapClickHandler onMapClick={handleMapClick} />
 
+          {/* ❗ 필터된 핀들을 순회할 때 커스텀 아이콘 팩 연동 */}
           {filteredPins.map((pin) => (
-            <Marker key={pin.id} position={[pin.lat, pin.lng]}>
+            <Marker key={pin.id} position={[pin.lat, pin.lng]} icon={createCustomIcon(pin.category)}>
               <Popup>
                 <div className="p-1 space-y-1">
                   <p className="font-black text-sm text-slate-800">{pin.title}</p>
@@ -175,7 +199,7 @@ export default function MapPage() {
           ))}
         </MapContainer>
 
-        {/* 1단계: 핫플레이스 위젯 */}
+        {/* 핫플레이스 위젯 */}
         <MapHotPlaces 
           hotPlaces={pins} 
           onPlaceClick={(place) => {
